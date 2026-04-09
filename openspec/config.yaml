@@ -1,0 +1,59 @@
+schema: spec-driven
+
+context: |
+  ## 專案
+  出缺勤管理系統（Attendance System）。介面語言：繁體中文（zh-TW）。
+
+  ## Tech Stack
+  - Frontend: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query v5, Zustand, React Hook Form, Zod
+  - Backend: Node.js 20, Express, TypeScript, Knex.js（query builder only，非 ORM）
+  - DB: PostgreSQL 16
+  - Auth: JWT access token（15m，in-memory）+ Refresh Token（7d，httpOnly cookie）
+  - Dev tools: MailHog（本地 Email 攔截）、pgAdmin（DB GUI）、Docker Compose
+
+  ## Backend 架構慣例
+  三層架構，職責嚴格分離：
+  - routes/*.routes.ts — Zod 驗證、authMiddleware、requireRole RBAC，委派給 service
+  - services/*.service.ts — 業務邏輯，錯誤用 AppError(statusCode, message) 拋出
+  - repositories/*.repository.ts — 純 Knex 查詢，不含業務邏輯
+
+  錯誤處理：throw new AppError(409, '訊息') 對應衝突；404 對應找不到；全域 errorHandler 統一格式化。
+  RBAC：requireRole('admin') 或 requireRole('admin', 'manager') 掛在路由上。
+  驗證：validate({ body: schema }) middleware + Zod schema。
+
+  ## Frontend 架構慣例
+  - api/*.api.ts — TanStack Query hooks（useQuery / useMutation）+ TypeScript 型別定義
+  - pages/*.tsx — 頁面元件，組合 shared 元件
+  - components/shared/ — DataTable、FormField、ConfirmDialog、StatusBadge、PageSkeleton
+  - components/ui/ — shadcn/ui primitives（Button、Input、Dialog、Select、Badge、Textarea…）
+  - store/authStore.ts — Zustand，管理 user 與 isLoading
+  - api/client.ts — Axios 實例，自動附加 Bearer token，401 時自動 refresh 並 retry
+
+  新增頁面標準步驟：api/*.api.ts → pages/*.tsx → router.tsx → Sidebar.tsx（加 roles 控制可見性）。
+
+  ## DB Schema 生命週期
+  初始 schema 由 Docker 透過 db/init/001_schema.sql 載入（docker-entrypoint-initdb.d）。
+  後續所有 schema 變更使用 Knex migration（backend/migrations/），需手動執行 npm run migrate。
+  knexfile 位於 backend/src/config/knexfile.ts，migrations 路徑設定為 ../../migrations。
+
+  ## RBAC 角色
+  admin > manager > employee。後端用 requireRole() 執行，前端 Sidebar 用 roles 陣列過濾顯示。
+
+  ## Auth 流程
+  登入後後端設 httpOnly refresh cookie 並回傳 access token。
+  Access token 僅存 in-memory（api/client.ts 模組變數，非 localStorage）。
+  401 時 Axios interceptor 自動打 /auth/refresh（帶 cookie），成功後 retry 原請求；失敗則導向 /login。
+  首次登入強制改密（must_change_password flag），router 自動導向 /change-password。
+
+rules:
+  proposal:
+    - 保持簡潔，說明目的、解法、Non-goals 即可
+    - 若涉及 DB schema 變更，需說明是新增 migration 還是初始 schema
+  design:
+    - 後端須明確列出新增的 routes、service 方法、repository 方法
+    - 前端須明確列出新增的 api hooks、pages、是否更新 router 與 Sidebar
+  tasks:
+    - 每個 task 以單一檔案或單一操作為單位，不要把多個檔案合併成一個 task
+    - Backend task 順序：repository → service → routes → app.ts 註冊
+    - Frontend task 順序：api hook → page → router → sidebar
+    - Migration task 獨立列出，標明需執行 npm run migrate

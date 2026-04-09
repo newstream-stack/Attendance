@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Attendance DB",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "attendance_user",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

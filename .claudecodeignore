@@ -1,0 +1,39 @@
+# 1. 依賴套件 (最佔空間，絕對不能讓 AI 讀)
+node_modules/
+**/node_modules/
+
+# 2. 鎖定檔 (動輒幾萬行，吃 Token 的超級怪物)
+package-lock.json
+**/package-lock.json
+yarn.lock
+**/yarn.lock
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+
+# 3. 編譯產物與快取
+dist/
+**/dist/
+build/
+**/build/
+.next/
+.vite/
+
+# 4. Git 歷史紀錄
+.git/
+
+# 5. 系統與日誌檔
+*.log
+npm-debug.log*/
+.DS_Store
+
+# 6. 本地資料庫 Volume (如果有設定 Docker 掛載本地資料夾的話)
+postgres-data/
+pgadmin-data/
+
+**/.env
+**/.env.local
+
+**/*.svg
+**/*.png
+**/*.jpg
+**/*.ico

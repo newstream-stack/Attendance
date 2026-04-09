@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(openspec instructions:*)",
+      "Bash(openspec status:*)",
+      "Bash(npm create:*)",
+      "Bash(/Applications/Docker.app/Contents/Resources/bin/docker compose:*)",
+      "Read(//Users/work/.docker/run/**)",
+      "Read(//Users/work/Library/Containers/com.docker.docker/Data/**)",
+      "Bash(docker context:*)"
+    ]
+  }
+}
