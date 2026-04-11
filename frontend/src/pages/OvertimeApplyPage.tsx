@@ -76,7 +76,7 @@ export default function OvertimeApplyPage() {
   }
 
   const columns: Column<OvertimeRequest>[] = [
-    { key: 'work_date', header: '加班日期', sortable: true },
+    { key: 'work_date', header: '加班日期', sortable: true, render: (r) => new Date(r.work_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) },
     { key: 'start_time', header: '開始', render: (r) => new Date(r.start_time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }) },
     { key: 'end_time', header: '結束', render: (r) => new Date(r.end_time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }) },
     { key: 'duration_mins', header: '時數', render: (r) => fmtMins(r.duration_mins) },

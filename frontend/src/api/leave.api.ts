@@ -103,6 +103,45 @@ export function useAllocateAnnual() {
   })
 }
 
+export interface AnnualLeavePreviewRow {
+  user_id: string
+  employee_id: string
+  full_name: string
+  department: string | null
+  hire_date: string
+  balance_id: string | null
+  statutory_days: number
+  allocated_mins: number
+  used_mins: number
+  carried_mins: number
+  adjusted_mins: number
+  remaining_mins: number
+}
+
+export function useAnnualLeavePreview(year: number) {
+  return useQuery({
+    queryKey: ['annual-preview', year],
+    queryFn: async () => {
+      const { data } = await apiClient.get<AnnualLeavePreviewRow[]>('/leave/annual-preview', { params: { year } })
+      return data
+    },
+  })
+}
+
+export function useAdjustLeaveBalance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, adjusted_mins }: { id: string; adjusted_mins: number }) => {
+      const { data } = await apiClient.put(`/leave/balances/${id}/adjust`, { adjusted_mins })
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['annual-preview'] })
+      qc.invalidateQueries({ queryKey: ['leave-balances'] })
+    },
+  })
+}
+
 // ─── Leave Requests ───────────────────────────────────────────────────────────
 
 export function useMyLeaveRequests() {

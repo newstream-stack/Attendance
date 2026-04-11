@@ -62,7 +62,7 @@ export default function AdminAllowedIpsPage() {
     { key: 'label', header: '備註', render: (row) => row.label ?? '—' },
     {
       key: 'created_at', header: '新增時間',
-      render: (row) => new Date(row.created_at).toLocaleDateString('zh-TW'),
+      render: (row) => new Date(row.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
     },
     {
       key: 'actions', header: '',

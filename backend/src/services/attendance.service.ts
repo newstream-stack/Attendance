@@ -2,6 +2,7 @@ import { findAllowedIpByAddress } from '../repositories/allowedIp.repository';
 import {
   findTodayRecord, clockIn, clockOut, listRecords, listAllRecords,
 } from '../repositories/attendance.repository';
+import { getSettings } from '../repositories/systemSettings.repository';
 import { AppError } from '../middleware/errorHandler';
 
 function getTaipeiDateString(): string {
@@ -17,7 +18,16 @@ export async function clockInService(userId: string, ipAddress: string) {
   const existing = await findTodayRecord(userId, workDate);
   if (existing) throw new AppError(409, '今日已打卡上班');
 
-  return clockIn(userId, workDate, ipAddress);
+  // Late detection: compare current Taipei time against work_start_time + tolerance
+  const settings = await getSettings();
+  const now = new Date();
+  const taipeiNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const nowMins = taipeiNow.getHours() * 60 + taipeiNow.getMinutes();
+  const [sh, sm] = settings.work_start_time.split(':').map(Number);
+  const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+  const isLate = nowMins > startMins;
+
+  return clockIn(userId, workDate, ipAddress, isLate);
 }
 
 export async function clockOutService(userId: string) {

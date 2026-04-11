@@ -18,7 +18,7 @@ router.get('/requests', async (req: Request, res: Response, next: NextFunction) 
 
 // GET /api/v1/overtime/requests/pending-approval
 router.get('/requests/pending-approval', requireRole('admin', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
-  try { res.json(await getPendingOvertimeForApprover(req.user!.id)); } catch (e) { next(e); }
+  try { res.json(await getPendingOvertimeForApprover(req.user!.id, req.user!.role === 'admin')); } catch (e) { next(e); }
 });
 
 // POST /api/v1/overtime/requests
@@ -27,8 +27,8 @@ router.post(
   validate({
     body: z.object({
       work_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      start_time: z.string().datetime(),
-      end_time: z.string().datetime(),
+      start_time: z.string().datetime({ offset: true }),
+      end_time: z.string().datetime({ offset: true }),
       reason: z.string().max(500).nullable().optional(),
       convert_to_comp: z.boolean().default(false),
     }),

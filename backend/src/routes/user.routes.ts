@@ -14,6 +14,17 @@ router.get('/me', (req: Request, res: Response) => {
   res.json(req.user);
 });
 
+// GET /api/v1/users/colleagues  (all active non-admin users, for proxy dropdown — all roles)
+router.get('/colleagues', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await getUsers();
+    const colleagues = users
+      .filter((u) => u.role !== 'admin' && u.is_active)
+      .map((u) => ({ id: u.id, full_name: u.full_name, employee_id: u.employee_id, role: u.role }));
+    res.json(colleagues);
+  } catch (err) { next(err); }
+});
+
 // GET /api/v1/users/managers  (dropdown for manager_id selection)
 router.get('/managers', requireRole('admin'), async (_req: Request, res: Response, next: NextFunction) => {
   try {

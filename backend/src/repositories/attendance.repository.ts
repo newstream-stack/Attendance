@@ -9,7 +9,7 @@ export async function findTodayRecord(userId: string, workDate: string): Promise
     .first();
 }
 
-export async function clockIn(userId: string, workDate: string, ipAddress: string): Promise<AttendanceRecord> {
+export async function clockIn(userId: string, workDate: string, ipAddress: string, isLate: boolean): Promise<AttendanceRecord> {
   const [record] = await db<AttendanceRecord>('attendance_records')
     .insert({
       user_id: userId,
@@ -17,6 +17,7 @@ export async function clockIn(userId: string, workDate: string, ipAddress: strin
       work_date: workDate,
       status: 'active',
       ip_address: ipAddress,
+      is_late: isLate,
     })
     .returning('*');
   return record;
@@ -45,6 +46,39 @@ export async function listRecords(
     .whereBetween('work_date', [startDate, endDate])
     .orderBy('work_date', 'desc')
     .orderBy('clock_in', 'desc');
+}
+
+export async function upsertClockIn(userId: string, workDate: string, clockInTime: string): Promise<AttendanceRecord> {
+  const existing = await findTodayRecord(userId, workDate);
+  if (existing) {
+    const [record] = await db<AttendanceRecord>('attendance_records')
+      .where({ id: existing.id })
+      .update({ clock_in: clockInTime, updated_at: db.fn.now() })
+      .returning('*');
+    return record;
+  }
+  const [record] = await db<AttendanceRecord>('attendance_records')
+    .insert({ user_id: userId, work_date: workDate, clock_in: clockInTime, status: 'active' })
+    .returning('*');
+  return record;
+}
+
+export async function updateClockOut(userId: string, workDate: string, clockOutTime: string): Promise<AttendanceRecord | undefined> {
+  const existing = await findTodayRecord(userId, workDate);
+  if (existing) {
+    const diffMs = new Date(clockOutTime).getTime() - new Date(existing.clock_in).getTime();
+    const durationMins = diffMs > 0 ? Math.round(diffMs / 60000) : null;
+    const [record] = await db<AttendanceRecord>('attendance_records')
+      .where({ id: existing.id })
+      .update({ clock_out: clockOutTime, duration_mins: durationMins, status: 'completed', updated_at: db.fn.now() })
+      .returning('*');
+    return record;
+  }
+  // No clock_in record — insert with only clock_out, duration_mins null
+  const [record] = await db<AttendanceRecord>('attendance_records')
+    .insert({ user_id: userId, work_date: workDate, clock_in: clockOutTime, clock_out: clockOutTime, status: 'completed', duration_mins: null })
+    .returning('*');
+  return record;
 }
 
 export async function listAllRecords(

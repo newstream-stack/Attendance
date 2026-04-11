@@ -11,7 +11,7 @@ import {
 } from '@/api/leave.api'
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('zh-TW')
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
 }
 function fmtMins(mins: number) {
   return `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}m` : ''}`

@@ -30,16 +30,17 @@ export async function listMyRequests(userId: string): Promise<(LeaveRequest & { 
     .orderBy('lr.created_at', 'desc');
 }
 
-export async function listPendingForApprover(approverId: string): Promise<(LeaveRequest & {
+export async function listPendingForApprover(approverId: string, isAdmin: boolean): Promise<(LeaveRequest & {
   leave_type_name: string; applicant_name: string; employee_id: string;
 })[]> {
-  return db('leave_requests as lr')
+  const q = db('leave_requests as lr')
     .join('leave_types as lt', 'lr.leave_type_id', 'lt.id')
     .join('users as u', 'lr.user_id', 'u.id')
-    .where('u.manager_id', approverId)
     .where('lr.status', 'pending')
     .select('lr.*', 'lt.name_zh as leave_type_name', 'u.full_name as applicant_name', 'u.employee_id')
     .orderBy('lr.submitted_at', 'asc');
+  if (!isAdmin) q.where('u.manager_id', approverId);
+  return q;
 }
 
 export async function updateRequestStatus(

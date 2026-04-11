@@ -28,13 +28,15 @@ export async function listMyOvertimeRequests(userId: string): Promise<OvertimeRe
 
 export async function listPendingOvertimeForApprover(
   approverId: string,
+  isAdmin: boolean,
 ): Promise<(OvertimeRequest & { full_name: string; employee_id: string })[]> {
-  return db('overtime_requests as o')
+  const q = db('overtime_requests as o')
     .join('users as u', 'o.user_id', 'u.id')
-    .where('u.manager_id', approverId)
     .where('o.status', 'pending')
     .select('o.*', 'u.full_name', 'u.employee_id')
     .orderBy('o.submitted_at', 'asc');
+  if (!isAdmin) q.where('u.manager_id', approverId);
+  return q;
 }
 
 export async function updateOvertimeStatus(id: string, status: string): Promise<OvertimeRequest> {

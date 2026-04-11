@@ -3,6 +3,22 @@ import { db } from '../config/database';
 const MINS_PER_DAY = 480; // 8h working day
 const MINS_HALF_DAY = 240;
 
+const LUNCH_START_MINS = 12 * 60 + 30; // 12:30
+const LUNCH_END_MINS = 13 * 60 + 30;   // 13:30
+
+/**
+ * Given a time range within a single day (in minutes from midnight),
+ * subtract any overlap with the lunch break (12:30–13:30).
+ */
+export function deductLunchBreak(startMins: number, endMins: number): number {
+  const raw = endMins - startMins;
+  if (raw <= 0) return 0;
+  const overlapStart = Math.max(startMins, LUNCH_START_MINS);
+  const overlapEnd = Math.min(endMins, LUNCH_END_MINS);
+  const overlap = Math.max(0, overlapEnd - overlapStart);
+  return raw - overlap;
+}
+
 /** Returns YYYY-MM-DD strings for every calendar day between start and end (inclusive) */
 function dateRange(start: Date, end: Date): string[] {
   const dates: string[] = [];

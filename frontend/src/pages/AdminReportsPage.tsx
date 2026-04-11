@@ -17,6 +17,7 @@ interface AttendanceRow {
   clock_out: string | null
   duration_mins: number | null
   status: string
+  is_late: boolean
 }
 
 interface LeaveSummaryRow {
@@ -103,11 +104,17 @@ export default function AdminReportsPage() {
     { key: 'employee_id', header: '員工編號', sortable: true },
     { key: 'full_name', header: '姓名', sortable: true },
     { key: 'department', header: '部門', render: (r) => r.department ?? '—' },
-    { key: 'work_date', header: '日期', sortable: true },
+    { key: 'work_date', header: '日期', sortable: true, render: (r) => new Date(r.work_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) },
     { key: 'clock_in', header: '上班', render: (r) => fmtTime(r.clock_in) },
     { key: 'clock_out', header: '下班', render: (r) => fmtTime(r.clock_out) },
     { key: 'duration_mins', header: '工時', render: (r) => fmtMins(r.duration_mins) },
     { key: 'status', header: '狀態', render: (r) => <StatusBadge status={r.status as never} /> },
+    {
+      key: 'is_late', header: '遲到',
+      render: (r) => r.is_late
+        ? <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">遲到</span>
+        : <span className="text-slate-400">—</span>,
+    },
   ]
 
   const leaveCols: Column<LeaveSummaryRow>[] = [

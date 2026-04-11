@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useMyLeaveRequests, useCancelLeaveRequest, LeaveRequest } from '@/api/leave.api'
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('zh-TW')
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
 }
 function fmtMins(mins: number) {
   const h = Math.floor(mins / 60)

@@ -33,7 +33,7 @@ export default function AttendanceHistoryPage() {
   const { data: records = [], isLoading } = useAttendanceHistory(query.start, query.end)
 
   const columns: Column<AttendanceRecord>[] = [
-    { key: 'work_date', header: '日期', sortable: true },
+    { key: 'work_date', header: '日期', sortable: true, render: (r) => new Date(r.work_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) },
     {
       key: 'clock_in', header: '上班',
       render: (r) => toLocalDate(r.clock_in),

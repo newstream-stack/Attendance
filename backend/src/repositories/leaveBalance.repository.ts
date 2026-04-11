@@ -35,3 +35,41 @@ export async function adjustBalance(id: string, adjustedMins: number): Promise<L
 export async function addBalance(id: string, mins: number): Promise<void> {
   await db('leave_balances').where({ id }).increment('allocated_mins', mins);
 }
+
+export interface BalanceWithUser {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  full_name: string;
+  department: string | null;
+  hire_date: string;
+  leave_type_id: string;
+  year: number;
+  allocated_mins: number;
+  used_mins: number;
+  carried_mins: number;
+  adjusted_mins: number;
+}
+
+export async function listAllWithUsers(year: number, leaveTypeId: string): Promise<BalanceWithUser[]> {
+  return db('leave_balances as lb')
+    .join('users as u', 'lb.user_id', 'u.id')
+    .where({ 'lb.year': year, 'lb.leave_type_id': leaveTypeId })
+    .whereNull('u.deleted_at')
+    .select(
+      'lb.id', 'lb.user_id', 'lb.leave_type_id', 'lb.year',
+      'lb.allocated_mins', 'lb.used_mins', 'lb.carried_mins', 'lb.adjusted_mins',
+      'u.employee_id', 'u.full_name', 'u.department', 'u.hire_date',
+    )
+    .orderBy('u.employee_id');
+}
+
+/** Insert or ADD to existing allocated_mins (never replaces) */
+export async function accumulateBalance(
+  userId: string, leaveTypeId: string, year: number, additionalMins: number,
+): Promise<void> {
+  await db('leave_balances')
+    .insert({ user_id: userId, leave_type_id: leaveTypeId, year, allocated_mins: additionalMins })
+    .onConflict(['user_id', 'leave_type_id', 'year'])
+    .merge({ allocated_mins: db.raw('leave_balances.allocated_mins + ?', [additionalMins]) });
+}

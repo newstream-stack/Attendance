@@ -63,6 +63,23 @@ export function useManagers() {
   })
 }
 
+export interface ColleagueOption {
+  id: string
+  full_name: string
+  employee_id: string
+  role: string
+}
+
+export function useColleagues() {
+  return useQuery({
+    queryKey: ['colleagues'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ColleagueOption[]>('/users/colleagues')
+      return data
+    },
+  })
+}
+
 export function useCreateUser() {
   const qc = useQueryClient()
   return useMutation({

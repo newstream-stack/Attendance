@@ -52,7 +52,18 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   ip_address: string | null;
   note: string | null;
+  is_late: boolean;
   created_at: Date;
+  updated_at: Date;
+}
+
+export interface SystemSettings {
+  id: number;
+  work_start_time: string;
+  work_end_time: string;
+  late_tolerance_mins: number;
+  hours_per_day: number;
+  base_bonus_days: number;
   updated_at: Date;
 }
 
@@ -171,6 +182,42 @@ export interface EmailLog {
   error_msg: string | null;
   sent_at: Date | null;
   created_at: Date;
+}
+
+export type MakeupPunchType = 'clock_in' | 'clock_out';
+export type MakeupPunchStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface MakeupPunchRules {
+  id: number;
+  deadline_working_days: number;
+  reason_required: boolean;
+  updated_at: Date;
+}
+
+export interface MakeupPunchRequest {
+  id: string;
+  user_id: string;
+  work_date: string;
+  punch_type: MakeupPunchType;
+  requested_time: string;
+  reason: string | null;
+  status: MakeupPunchStatus;
+  reviewed_by: string | null;
+  review_comment: string | null;
+  reviewed_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface OutingRecord {
+  id: string;
+  user_id: string;
+  outing_date: string;
+  destination: string;
+  leave_type_id: string | null;
+  note: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 // JWT payload

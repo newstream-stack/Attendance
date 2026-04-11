@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/rbac';
 import {
   getLeaveTypes, createNewLeaveType, editLeaveType,
   getMyBalances, allocateAnnualAll, adjustLeaveBalance,
+  previewAnnualLeave, getAllAnnualBalances,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
   approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest,
 } from '../services/leave.service';
@@ -76,6 +77,20 @@ router.post(
   },
 );
 
+router.get('/balances/all', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    res.json(await getAllAnnualBalances(year));
+  } catch (e) { next(e); }
+});
+
+router.get('/annual-preview', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    res.json(await previewAnnualLeave(year));
+  } catch (e) { next(e); }
+});
+
 router.put(
   '/balances/:id/adjust',
   requireRole('admin'),
@@ -92,7 +107,7 @@ router.get('/requests', async (req: Request, res: Response, next: NextFunction) 
 });
 
 router.get('/requests/pending-approval', requireRole('admin', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
-  try { res.json(await getPendingForApprover(req.user!.id)); } catch (e) { next(e); }
+  try { res.json(await getPendingForApprover(req.user!.id, req.user!.role === 'admin')); } catch (e) { next(e); }
 });
 
 router.post(
@@ -101,8 +116,8 @@ router.post(
     body: z.object({
       leave_type_id: z.string().uuid(),
       work_proxy_user_id: z.string().uuid().nullable().optional(),
-      start_time: z.string().datetime(),
-      end_time: z.string().datetime(),
+      start_time: z.string().datetime({ offset: true }),
+      end_time: z.string().datetime({ offset: true }),
       half_day: z.boolean().default(false),
       half_day_period: z.enum(['am', 'pm']).nullable().optional(),
       reason: z.string().max(500).nullable().optional(),

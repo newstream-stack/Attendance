@@ -81,7 +81,7 @@ npm run dev
 
 | 角色 | Email | 密碼 |
 |------|-------|------|
-| 管理員 | `admin@company.com` | `Admin@1234` |
+| 管理員 | `admin@company.com` | `Admin1234!` |
 
 > ⚠️ 首次登入後系統會要求修改密碼。
 

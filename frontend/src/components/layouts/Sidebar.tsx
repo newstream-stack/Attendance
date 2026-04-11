@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Clock, CalendarOff, Timer, Users,
-  Settings, LogOut, UserCheck, BarChart3, X, Shield, Building2
+  Settings, LogOut, BarChart3, X, Shield, Building2, ClipboardEdit
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -15,19 +15,26 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: '儀表板', to: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
-  { label: '打卡記錄', to: '/attendance/history', icon: <Clock className="h-5 w-5" /> },
-  { label: '請假申請', to: '/leave/apply', icon: <CalendarOff className="h-5 w-5" /> },
-  { label: '我的假期', to: '/leave/history', icon: <CalendarOff className="h-5 w-5" /> },
-  { label: '假期餘額', to: '/leave/balances', icon: <CalendarOff className="h-5 w-5" /> },
-  { label: '加班申請', to: '/overtime/apply', icon: <Timer className="h-5 w-5" /> },
-  { label: '代理人設定', to: '/proxy', icon: <UserCheck className="h-5 w-5" /> },
+  { label: '儀表板', to: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '打卡記錄', to: '/attendance/history', icon: <Clock className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '請假申請', to: '/leave/apply', icon: <CalendarOff className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '我的假期', to: '/leave/history', icon: <CalendarOff className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '加班申請', to: '/overtime/apply', icon: <Timer className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '外出單', to: '/outing', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '補打卡申請', to: '/makeup-punch/apply', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['employee', 'manager'] },
+  { label: '補打卡記錄', to: '/makeup-punch/history', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['employee', 'manager'] },
   { label: '待審核（請假）', to: '/leave/approvals', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin', 'manager'] },
   { label: '待審核（加班）', to: '/overtime/approvals', icon: <Timer className="h-5 w-5" />, roles: ['admin', 'manager'] },
   { label: '員工管理', to: '/admin/users', icon: <Users className="h-5 w-5" />, roles: ['admin'] },
   { label: '部門管理', to: '/admin/departments', icon: <Building2 className="h-5 w-5" />, roles: ['admin'] },
   { label: '打卡 IP 管理', to: '/admin/allowed-ips', icon: <Shield className="h-5 w-5" />, roles: ['admin'] },
   { label: '假別設定', to: '/admin/leave-types', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
+  { label: '年假管理', to: '/admin/annual-leave', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin'] },
+  { label: '外出記錄', to: '/admin/outings', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['admin', 'manager'] },
+  { label: '補打卡審核', to: '/admin/makeup-punch/review', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['admin', 'manager'] },
+  { label: '補打卡規則', to: '/admin/makeup-punch/rules', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
+  { label: '公假管理', to: '/admin/public-holidays', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin'] },
+  { label: '系統設定', to: '/admin/system-settings', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
   { label: '報表', to: '/admin/reports', icon: <BarChart3 className="h-5 w-5" />, roles: ['admin', 'manager'] },
 ]
 

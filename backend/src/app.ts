@@ -13,6 +13,10 @@ import proxyRouter from './routes/proxy.routes';
 import notificationRouter from './routes/notification.routes';
 import reportRouter from './routes/report.routes';
 import departmentRouter from './routes/department.routes';
+import makeupPunchRouter from './routes/makeupPunch.routes';
+import systemSettingsRouter from './routes/systemSettings.routes';
+import publicHolidayRouter from './routes/publicHoliday.routes';
+import outingRouter from './routes/outing.routes';
 
 const app = express();
 
@@ -45,6 +49,10 @@ app.use('/api/v1/proxy', proxyRouter);
 app.use('/api/v1/notifications', notificationRouter);
 app.use('/api/v1/reports', reportRouter);
 app.use('/api/v1/departments', departmentRouter);
+app.use('/api/v1/makeup-punch', makeupPunchRouter);
+app.use('/api/v1/system-settings', systemSettingsRouter);
+app.use('/api/v1/public-holidays', publicHolidayRouter);
+app.use('/api/v1/outings', outingRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);

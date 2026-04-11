@@ -13,7 +13,8 @@ import { DataTable, Column } from '@/components/shared/DataTable'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useMyProxies, useCreateProxy, useUpdateProxy, useDeleteProxy, ProxyAssignment } from '@/api/proxy.api'
-import { useManagers } from '@/api/users.api'
+import { useColleagues } from '@/api/users.api'
+import { useAuthStore } from '@/store/authStore'
 
 const SCOPE_LABELS = { leave_approval: '請假簽核', all: '全部簽核' }
 
@@ -29,7 +30,9 @@ type FormData = z.infer<typeof schema>
 export default function ProxyPage() {
   const { toast } = useToast()
   const { data: proxies = [], isLoading } = useMyProxies()
-  const { data: managers = [] } = useManagers()
+  const { user: currentUser } = useAuthStore()
+  const { data: colleagues = [] } = useColleagues()
+  const proxyOptions = colleagues.filter((u) => u.id !== currentUser?.id)
   const createProxy = useCreateProxy()
   const updateProxy = useUpdateProxy()
   const deleteProxy = useDeleteProxy()
@@ -122,9 +125,12 @@ export default function ProxyPage() {
                 <Select onValueChange={field.onChange} value={field.value}>
                   <SelectTrigger><SelectValue placeholder="選擇代理人" /></SelectTrigger>
                   <SelectContent>
-                    {managers.map((m) => (
+                    {proxyOptions.map((m) => (
                       <SelectItem key={m.id} value={m.id}>{m.full_name}（{m.employee_id}）</SelectItem>
                     ))}
+                    {proxyOptions.length === 0 && (
+                      <SelectItem value="_empty" disabled>目前無可選擇的代理人</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               )} />

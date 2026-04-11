@@ -1,5 +1,5 @@
 import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } from '../repositories/leaveType.repository';
-import { getBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance } from '../repositories/leaveBalance.repository';
+import { getBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, updateRequestStatus, createApproval, CreateLeaveRequestData,
@@ -37,7 +37,7 @@ export async function getMyBalances(userId: string, year: number) {
   }));
 }
 
-/** Allocate annual leave for a single user for the given year */
+/** Allocate annual leave for a single user for the given year (accumulates on top of existing) */
 export async function allocateAnnualForUser(userId: string, hireDate: string, year: number) {
   const annualType = (await listLeaveTypes(true)).find((t) => t.code === 'annual');
   if (!annualType) throw new AppError(500, '找不到年假假別');
@@ -45,15 +45,56 @@ export async function allocateAnnualForUser(userId: string, hireDate: string, ye
   const days = calcAnnualLeaveDays(hireDate, new Date(`${year}-01-01`));
   if (days === 0) return; // not yet eligible
   const mins = daysToMins(days);
-  await upsertBalance(userId, annualType.id, year, mins);
+  await accumulateBalance(userId, annualType.id, year, mins);
 }
 
-/** Batch allocate annual leave for all active users */
+/** Batch allocate annual leave for all active users (accumulates) */
 export async function allocateAnnualAll(year: number) {
   const users = await listUsers();
   const active = users.filter((u) => u.is_active && !u.deleted_at);
   await Promise.all(active.map((u) => allocateAnnualForUser(u.id, u.hire_date, year)));
   return { allocated: active.length };
+}
+
+/** Preview annual leave allocation (no DB write) */
+export async function previewAnnualLeave(year: number) {
+  const users = await listUsers();
+  const active = users.filter((u) => u.is_active && !u.deleted_at);
+  const annualType = (await listLeaveTypes(false)).find((t) => t.code === 'annual');
+  if (!annualType) throw new AppError(500, '找不到年假假別');
+
+  const allBalances = await listAllWithUsers(year, annualType.id);
+
+  return active.map((u) => {
+    const existing = allBalances.find((b) => b.user_id === u.id);
+    const statutory_days = calcAnnualLeaveDays(u.hire_date, new Date(`${year}-01-01`));
+    const allocated_mins = existing?.allocated_mins ?? 0;
+    const used_mins = existing?.used_mins ?? 0;
+    const carried_mins = existing?.carried_mins ?? 0;
+    const adjusted_mins = existing?.adjusted_mins ?? 0;
+    const remaining_mins = allocated_mins + carried_mins + adjusted_mins - used_mins;
+    return {
+      user_id: u.id,
+      employee_id: u.employee_id,
+      full_name: u.full_name,
+      department: u.department ?? null,
+      hire_date: u.hire_date,
+      balance_id: existing?.id ?? null,
+      statutory_days,
+      allocated_mins,
+      used_mins,
+      carried_mins,
+      adjusted_mins,
+      remaining_mins,
+    };
+  });
+}
+
+/** Get all employees' annual leave balances for admin */
+export async function getAllAnnualBalances(year: number) {
+  const annualType = (await listLeaveTypes(false)).find((t) => t.code === 'annual');
+  if (!annualType) throw new AppError(500, '找不到年假假別');
+  return listAllWithUsers(year, annualType.id);
 }
 
 export async function adjustLeaveBalance(balanceId: string, adjustedMins: number) {
@@ -108,8 +149,8 @@ export async function getMyLeaveRequests(userId: string) {
   return listMyRequests(userId);
 }
 
-export async function getPendingForApprover(approverId: string) {
-  return listPendingForApprover(approverId);
+export async function getPendingForApprover(approverId: string, isAdmin: boolean) {
+  return listPendingForApprover(approverId, isAdmin);
 }
 
 export async function approveLeaveRequest(requestId: string, approverId: string, comment?: string) {

@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 # Attendance System
 Lang: zh-TW
 
@@ -83,3 +81,9 @@ hooks/useAuth.ts        — Convenience wrapper over authStore + logout
 
 ### RBAC
 Three roles: `admin` > `manager` > `employee`. Backend enforces via `requireRole()` middleware. Frontend conditionally renders nav items and UI elements based on `user.role` from authStore.
+
+## Constraints (Behavior Rules)
+- NEVER explain code or logic unless explicitly asked.
+- Be concise. Skip preamble and conversational filler.
+- Only output the requested code or commands.
+- Do not summarize what you just did at the end of a response.

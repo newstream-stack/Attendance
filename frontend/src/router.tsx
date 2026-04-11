@@ -21,6 +21,15 @@ import OvertimeApprovalsPage from '@/pages/OvertimeApprovalsPage'
 import ProxyPage from '@/pages/ProxyPage'
 import AdminReportsPage from '@/pages/AdminReportsPage'
 import AdminDepartmentsPage from '@/pages/AdminDepartmentsPage'
+import MakeupPunchApplyPage from '@/pages/MakeupPunchApplyPage'
+import MakeupPunchHistoryPage from '@/pages/MakeupPunchHistoryPage'
+import AdminMakeupPunchReviewPage from '@/pages/AdminMakeupPunchReviewPage'
+import AdminMakeupPunchRulesPage from '@/pages/AdminMakeupPunchRulesPage'
+import AdminAnnualLeaveAllocationPage from '@/pages/AdminAnnualLeaveAllocationPage'
+import AdminSystemSettingsPage from '@/pages/AdminSystemSettingsPage'
+import AdminPublicHolidaysPage from '@/pages/AdminPublicHolidaysPage'
+import OutingPage from '@/pages/OutingPage'
+import AdminOutingsPage from '@/pages/AdminOutingsPage'
 
 function PrivateRoute() {
   const { user, isLoading } = useAuthStore()
@@ -40,7 +49,7 @@ function PrivateRoute() {
 function PublicRoute() {
   const { user, isLoading } = useAuthStore()
   if (isLoading) return <PageSkeleton />
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) return <Navigate to={user.role === 'admin' ? '/leave/approvals' : '/dashboard'} replace />
   return (
     <PublicLayout>
       <Outlet />
@@ -48,10 +57,16 @@ function PublicRoute() {
   )
 }
 
+function RootRedirect() {
+  const { user, isLoading } = useAuthStore()
+  if (isLoading) return <PageSkeleton />
+  return <Navigate to={user?.role === 'admin' ? '/leave/approvals' : '/dashboard'} replace />
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <RootRedirect />,
   },
   {
     element: <PublicRoute />,
@@ -79,6 +94,15 @@ export const router = createBrowserRouter([
       { path: '/proxy', element: <ProxyPage /> },
       { path: '/admin/reports', element: <AdminReportsPage /> },
       { path: '/admin/departments', element: <AdminDepartmentsPage /> },
+      { path: '/makeup-punch/apply', element: <MakeupPunchApplyPage /> },
+      { path: '/makeup-punch/history', element: <MakeupPunchHistoryPage /> },
+      { path: '/admin/makeup-punch/review', element: <AdminMakeupPunchReviewPage /> },
+      { path: '/admin/makeup-punch/rules', element: <AdminMakeupPunchRulesPage /> },
+      { path: '/admin/annual-leave', element: <AdminAnnualLeaveAllocationPage /> },
+      { path: '/admin/system-settings', element: <AdminSystemSettingsPage /> },
+      { path: '/admin/public-holidays', element: <AdminPublicHolidaysPage /> },
+      { path: '/outing', element: <OutingPage /> },
+      { path: '/admin/outings', element: <AdminOutingsPage /> },
     ],
   },
 ])

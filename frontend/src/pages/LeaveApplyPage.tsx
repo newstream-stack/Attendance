@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FormField } from '@/components/shared/FormField'
 import { useToast } from '@/hooks/use-toast'
 import { useLeaveTypes, useSubmitLeaveRequest } from '@/api/leave.api'
+import { useColleagues } from '@/api/users.api'
 
 const schema = z.object({
   leave_type_id: z.string().uuid('請選擇假別'),
@@ -18,6 +19,7 @@ const schema = z.object({
   end_time: z.string().min(1, '請選擇結束日期'),
   half_day: z.boolean().default(false),
   half_day_period: z.enum(['am', 'pm']).nullable().optional(),
+  work_proxy_user_id: z.string().uuid().nullable().optional(),
   reason: z.string().max(500).optional(),
 }).refine((d) => d.start_time <= d.end_time, {
   message: '結束日期不得早於開始日期',
@@ -30,6 +32,7 @@ export default function LeaveApplyPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { data: leaveTypes = [] } = useLeaveTypes()
+  const { data: colleagues = [] } = useColleagues()
   const submitLeave = useSubmitLeaveRequest()
   const [isHalfDay, setIsHalfDay] = useState(false)
 
@@ -50,6 +53,7 @@ export default function LeaveApplyPage() {
         end_time: endISO,
         half_day: data.half_day,
         half_day_period: data.half_day ? data.half_day_period : null,
+        work_proxy_user_id: data.work_proxy_user_id ?? null,
         reason: data.reason || null,
       })
       toast({ title: '請假申請已送出', description: '等待主管審核' })
@@ -122,6 +126,27 @@ export default function LeaveApplyPage() {
                 />
               </FormField>
             )}
+
+            <FormField label="代理人" error={errors.work_proxy_user_id}>
+              <Controller
+                name="work_proxy_user_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
+                    value={field.value ?? 'none'}
+                  >
+                    <SelectTrigger><SelectValue placeholder="選填，選擇代理人" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">不指定</SelectItem>
+                      {colleagues.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.full_name}（{c.employee_id}）</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormField>
 
             <FormField label="原因" error={errors.reason}>
               <textarea

@@ -15,9 +15,11 @@ router.use(authMiddleware);
 router.post('/clock-in', async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Support proxy headers (nginx / load balancer)
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+    const raw = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
       ?? req.socket.remoteAddress
       ?? '';
+    // Normalize IPv6 loopback and IPv4-mapped IPv6 to plain IPv4
+    const ip = raw === '::1' ? '127.0.0.1' : raw.startsWith('::ffff:') ? raw.slice(7) : raw;
     const record = await clockInService(req.user!.id, ip);
     res.status(201).json(record);
   } catch (err) {

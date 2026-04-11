@@ -7,6 +7,7 @@ import { getBalance, upsertBalance, addBalance } from '../repositories/leaveBala
 import { findUserById } from '../repositories/user.repository';
 import { AppError } from '../middleware/errorHandler';
 import { db } from '../config/database';
+import { deductLunchBreak } from '../utils/workingDays';
 
 export async function submitOvertimeRequest(data: {
   userId: string;
@@ -18,8 +19,15 @@ export async function submitOvertimeRequest(data: {
 }) {
   if (data.endTime <= data.startTime) throw new AppError(400, '結束時間須晚於開始時間');
 
-  const durationMins = Math.round((data.endTime.getTime() - data.startTime.getTime()) / 60000);
-  if (durationMins < 30) throw new AppError(400, '加班時間至少 30 分鐘');
+  // Deduct lunch break (12:30–13:30) from duration
+  const toTaipeiMins = (d: Date) => {
+    const local = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    return local.getHours() * 60 + local.getMinutes();
+  };
+  const startMins = toTaipeiMins(data.startTime);
+  const endMins = toTaipeiMins(data.endTime);
+  const durationMins = deductLunchBreak(startMins, endMins);
+  if (durationMins < 30) throw new AppError(400, '加班時間至少 30 分鐘（扣除午休後）');
 
   return createOvertimeRequest({
     user_id: data.userId,
@@ -36,8 +44,8 @@ export async function getMyOvertimeRequests(userId: string) {
   return listMyOvertimeRequests(userId);
 }
 
-export async function getPendingOvertimeForApprover(approverId: string) {
-  return listPendingOvertimeForApprover(approverId);
+export async function getPendingOvertimeForApprover(approverId: string, isAdmin: boolean) {
+  return listPendingOvertimeForApprover(approverId, isAdmin);
 }
 
 export async function approveOvertimeRequest(requestId: string, approverId: string, comment?: string) {
