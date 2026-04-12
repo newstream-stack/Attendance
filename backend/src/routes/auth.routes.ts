@@ -10,8 +10,8 @@ const router = Router();
 const REFRESH_COOKIE = 'refreshToken';
 const cookieOpts = {
   httpOnly: true,
-  secure: env.isProduction,
-  sameSite: 'strict' as const,
+  secure: true, // 跨域部署必須 Secure=true
+  sameSite: 'none' as const, // 跨域 Cookie 必須 SameSite=none
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
