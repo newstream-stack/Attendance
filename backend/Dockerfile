@@ -21,5 +21,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+COPY src/config/knexfile.ts ./src/config/knexfile.ts
+COPY migrations ./migrations
 EXPOSE 4000
-CMD ["node", "dist/server.js"]
+CMD ["npm", "start"]
