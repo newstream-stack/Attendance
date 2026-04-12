@@ -29,7 +29,7 @@ export async function updateProxy(id: string, principalId: string, data: {
 }): Promise<ProxyAssignment> {
   const [row] = await db<ProxyAssignment>('proxy_assignments')
     .where({ id, principal_id: principalId })
-    .update(data)
+    .update(data as any)
     .returning('*');
   return row;
 }
