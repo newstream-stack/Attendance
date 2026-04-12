@@ -12,7 +12,7 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-const server = app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, '0.0.0.0', () => {
   console.log(`[server] 出缺勤管理系統 API 啟動於 port ${env.PORT} (${env.NODE_ENV})`);
 });
 
