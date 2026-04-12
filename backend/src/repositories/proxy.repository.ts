@@ -17,7 +17,7 @@ export async function createProxy(data: {
   scope: string;
   created_by: string;
 }): Promise<ProxyAssignment> {
-  const [row] = await db<ProxyAssignment>('proxy_assignments').insert(data).returning('*');
+  const [row] = await db<ProxyAssignment>('proxy_assignments').insert(data as any).returning('*');
   return row;
 }
 

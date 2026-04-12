@@ -2,15 +2,17 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { FormField } from '@/components/shared/FormField'
-import { DataTable } from '@/components/shared/DataTable'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { MonthCalendar } from '@/components/shared/MonthCalendar'
 import { useToast } from '@/hooks/use-toast'
-import { usePublicHolidays, useCreatePublicHoliday, useDeletePublicHoliday, PublicHoliday } from '@/api/publicHoliday.api'
+import {
+  usePublicHolidays, useCreatePublicHoliday, useDeletePublicHoliday, useImportTaiwanHolidays, PublicHoliday,
+} from '@/api/publicHoliday.api'
 
 const schema = z.object({
   holiday_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '請選擇日期'),
@@ -18,18 +20,27 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
+function toDateKey(raw: string): string {
+  if (!raw) return ''
+  if (raw.length === 10) return raw
+  return new Date(raw).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+}
+
 export default function AdminPublicHolidaysPage() {
   const { toast } = useToast()
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(currentYear)
   const [createOpen, setCreateOpen] = useState(false)
+  const [detailTarget, setDetailTarget] = useState<PublicHoliday | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PublicHoliday | null>(null)
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false)
 
   const { data: holidays = [], isLoading } = usePublicHolidays(year)
   const createHoliday = useCreatePublicHoliday()
   const deleteHoliday = useDeletePublicHoliday()
+  const importHolidays = useImportTaiwanHolidays()
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { holiday_date: `${year}-01-01`, name: '' },
   })
@@ -47,26 +58,37 @@ export default function AdminPublicHolidaysPage() {
     })
   }
 
-  const columns = [
-    { key: 'holiday_date', header: '日期' },
-    { key: 'name', header: '名稱' },
-    {
-      key: 'actions',
-      header: '',
-      render: (row: PublicHoliday) => (
-        <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700"
-          onClick={() => setDeleteTarget(row)}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      ),
-    },
-  ]
+  const handleImport = () => {
+    importHolidays.mutate(year, {
+      onSuccess: ({ inserted }) => {
+        toast({ title: inserted > 0 ? `匯入完成，新增 ${inserted} 筆假期` : '匯入完成（已是最新資料）' })
+        setImportConfirmOpen(false)
+      },
+      onError: (err: any) => {
+        toast({ title: err?.response?.data?.message ?? '匯入失敗', variant: 'destructive' })
+        setImportConfirmOpen(false)
+      },
+    })
+  }
+
+  /** Click on a holiday day → show detail/delete dialog.
+   *  Click on an empty day → open create form with date pre-filled. */
+  const handleDayClick = (date: string, holiday: PublicHoliday | undefined) => {
+    if (holiday) {
+      setDetailTarget(holiday)
+    } else {
+      setValue('holiday_date', date)
+      setValue('name', '')
+      setCreateOpen(true)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-slate-900">公假管理</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Input
             type="number"
             className="w-28"
@@ -75,19 +97,69 @@ export default function AdminPublicHolidaysPage() {
             min={2020}
             max={2100}
           />
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="outline"
+            onClick={() => setImportConfirmOpen(true)}
+            disabled={importHolidays.isPending || year < 2024 || year > 2027}
+          >
+            <Download className="h-4 w-4 mr-1" />匯入台灣假期
+          </Button>
+          <Button onClick={() => { reset({ holiday_date: `${year}-01-01`, name: '' }); setCreateOpen(true) }}>
             <Plus className="h-4 w-4 mr-1" />新增公假
           </Button>
         </div>
       </div>
 
+      {/* Legend */}
+      <p className="text-xs text-slate-400">點選紅色日期可查看假期名稱或取消；點選其他日期可新增公假</p>
+
       {isLoading ? (
         <p className="text-slate-500">載入中…</p>
       ) : (
-        <DataTable data={holidays as any[]} columns={columns as any} emptyText="該年度尚無公假記錄" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+            <MonthCalendar
+              key={month}
+              year={year}
+              month={month}
+              holidays={holidays}
+              onDayClick={handleDayClick}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Create dialog */}
+      {/* Holiday detail dialog — shown when user clicks a holiday day */}
+      <Dialog open={!!detailTarget} onOpenChange={(o) => { if (!o) setDetailTarget(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>假期資訊</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex gap-3">
+              <span className="text-sm text-slate-500 w-12 shrink-0">日期</span>
+              <span className="text-sm font-medium text-slate-800">
+                {detailTarget ? toDateKey(detailTarget.holiday_date) : ''}
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-sm text-slate-500 w-12 shrink-0">名稱</span>
+              <span className="text-sm font-medium text-slate-800">{detailTarget?.name}</span>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDetailTarget(null)}>關閉</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { setDeleteTarget(detailTarget); setDetailTarget(null) }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />取消假期
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create dialog — also opens when clicking an empty day */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -108,19 +180,29 @@ export default function AdminPublicHolidaysPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Import confirm */}
+      <ConfirmDialog
+        open={importConfirmOpen}
+        onOpenChange={(o) => { if (!o) setImportConfirmOpen(false) }}
+        title={`匯入 ${year} 年台灣假期`}
+        description={`將匯入 ${year} 年台灣官定假期（僅支援 2024–2027），已存在的日期會自動略過。`}
+        confirmLabel="匯入"
+        onConfirm={handleImport}
+      />
+
       {/* Delete confirm */}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
-        title="確認刪除"
-        description={`確定要刪除「${deleteTarget?.name}（${deleteTarget?.holiday_date}）」？`}
-        confirmLabel="刪除"
+        title="確認取消假期"
+        description={`確定要取消「${deleteTarget?.name}（${deleteTarget ? toDateKey(deleteTarget.holiday_date) : ''}）」？`}
+        confirmLabel="取消假期"
         variant="destructive"
         onConfirm={() => {
           if (!deleteTarget) return
           deleteHoliday.mutate(deleteTarget.id, {
-            onSuccess: () => { toast({ title: '已刪除' }); setDeleteTarget(null) },
-            onError: () => toast({ title: '刪除失敗', variant: 'destructive' }),
+            onSuccess: () => { toast({ title: '假期已取消' }); setDeleteTarget(null) },
+            onError: () => toast({ title: '操作失敗', variant: 'destructive' }),
           })
         }}
       />

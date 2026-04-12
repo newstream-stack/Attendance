@@ -13,8 +13,9 @@ const columns: Column<OutingRecord>[] = [
     key: 'outing_date', header: '外出日期', sortable: true,
     render: (r) => new Date(r.outing_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
   },
+  { key: 'outing_time', header: '時間', render: (r) => r.outing_time ? r.outing_time.slice(0, 5) : '—' },
+  { key: 'outing_type', header: '項目', render: (r) => r.outing_type ?? '—' },
   { key: 'destination', header: '外出地點' },
-  { key: 'leave_type_name', header: '假別', render: (r) => r.leave_type_name ?? '—' },
   { key: 'note', header: '備註', render: (r) => r.note ?? '—' },
 ]
 
@@ -44,7 +45,7 @@ export default function AdminOutingsPage() {
       <h1 className="text-2xl font-bold text-slate-900">外出記錄</h1>
 
       {/* Tabs */}
-      <div className="flex border-b">
+      <div className="flex border-b overflow-x-auto">
         {(['today', 'search'] as const).map((t) => (
           <button
             key={t}
@@ -66,11 +67,11 @@ export default function AdminOutingsPage() {
       ) : (
         <div className="space-y-4">
           {/* Search filters */}
-          <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-slate-500 whitespace-nowrap">員工</label>
+              <label className="text-sm text-slate-500 w-8 shrink-0">員工</label>
               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger className="w-44">
+                <SelectTrigger className="flex-1 sm:w-44">
                   <SelectValue placeholder="選擇員工" />
                 </SelectTrigger>
                 <SelectContent>
@@ -84,24 +85,24 @@ export default function AdminOutingsPage() {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-slate-500">開始日期</label>
+              <label className="text-sm text-slate-500 w-14 shrink-0">開始日期</label>
               <Input
                 type="date"
-                className="w-36"
+                className="flex-1 sm:w-36"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-slate-500">結束日期</label>
+              <label className="text-sm text-slate-500 w-14 shrink-0">結束日期</label>
               <Input
                 type="date"
-                className="w-36"
+                className="flex-1 sm:w-36"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
               />
             </div>
-            <Button variant="outline" onClick={handleSearch}>查詢</Button>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={handleSearch}>查詢</Button>
           </div>
 
           <DataTable

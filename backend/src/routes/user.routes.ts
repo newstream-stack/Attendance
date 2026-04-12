@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
-import { getUsers, getManagers, createNewUser, editUser, toggleUserActive, adminResetPassword, deleteUser } from '../services/user.service';
+import { getUsers, getManagers, createNewUser, editUser, toggleUserActive, adminResetPassword, deleteUser, sendUserResetEmail } from '../services/user.service';
 
 const router = Router();
 
@@ -71,6 +71,7 @@ router.post(
 );
 
 const updateUserSchema = z.object({
+  employee_id: z.string().min(1).max(20).optional(),
   email: z.string().email().optional(),
   full_name: z.string().min(1).max(100).optional(),
   role: z.enum(['admin', 'manager', 'employee']).optional(),
@@ -100,6 +101,16 @@ router.post('/:id/reset-password', requireRole('admin'), async (req: Request, re
   try {
     const result = await adminResetPassword(req.params.id);
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/users/:id/send-reset-email  (admin: 傳送密碼重設信給員工)
+router.post('/:id/send-reset-email', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await sendUserResetEmail(req.params.id);
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import {
-  getPublicHolidaysByYear, createPublicHoliday, deletePublicHoliday,
+  getPublicHolidaysByYear, createPublicHoliday, deletePublicHoliday, importTaiwanHolidays,
 } from '../services/publicHoliday.service';
 
 const router = Router();
@@ -30,6 +30,20 @@ router.post(
   }),
   async (req: Request, res: Response, next: NextFunction) => {
     try { res.status(201).json(await createPublicHoliday(req.body)); } catch (e) { next(e); }
+  },
+);
+
+// POST /api/v1/public-holidays/import  { year }
+router.post(
+  '/import',
+  requireRole('admin'),
+  validate({
+    body: z.object({
+      year: z.number().int().min(2024).max(2027),
+    }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json(await importTaiwanHolidays(req.body.year)); } catch (e) { next(e); }
   },
 );
 

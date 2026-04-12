@@ -42,7 +42,7 @@ export async function listPendingOvertimeForApprover(
 export async function updateOvertimeStatus(id: string, status: string): Promise<OvertimeRequest> {
   const [row] = await db<OvertimeRequest>('overtime_requests')
     .where({ id })
-    .update({ status, updated_at: db.fn.now() })
+    .update({ status: status as any, updated_at: db.fn.now() })
     .returning('*');
   return row;
 }

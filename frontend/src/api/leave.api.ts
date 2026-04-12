@@ -37,6 +37,8 @@ export interface LeaveRequest {
   half_day_period: 'am' | 'pm' | null
   reason: string | null
   status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'recalled'
+  proxy_status: 'pending' | 'approved' | 'rejected' | null
+  proxy_comment: string | null
   submitted_at: string
   created_at: string
   // joined
@@ -198,6 +200,36 @@ export function useRejectLeaveRequest() {
   return useMutation({
     mutationFn: async ({ id, comment }: { id: string; comment?: string }) => {
       await apiClient.post(`/leave/requests/${id}/reject`, { comment })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
+  })
+}
+
+export function usePendingProxyRequests() {
+  return useQuery({
+    queryKey: ['leave-requests', 'proxy-pending'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<LeaveRequest[]>('/leave/requests/proxy-pending')
+      return data
+    },
+  })
+}
+
+export function useProxyApprove() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, comment }: { id: string; comment?: string }) => {
+      await apiClient.post(`/leave/requests/${id}/proxy-approve`, { comment })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
+  })
+}
+
+export function useProxyReject() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, comment }: { id: string; comment?: string }) => {
+      await apiClient.post(`/leave/requests/${id}/proxy-reject`, { comment })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
   })

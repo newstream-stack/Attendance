@@ -90,6 +90,8 @@ export interface LeaveBalance {
   adjusted_mins: number;
 }
 
+export type ProxyStatus = 'pending' | 'approved' | 'rejected';
+
 export interface LeaveRequest {
   id: string;
   user_id: string;
@@ -102,6 +104,9 @@ export interface LeaveRequest {
   half_day_period: HalfDayPeriod | null;
   reason: string | null;
   status: LeaveRequestStatus;
+  proxy_status: ProxyStatus | null;
+  proxy_comment: string | null;
+  proxy_acted_at: Date | null;
   submitted_at: Date;
   created_at: Date;
   updated_at: Date;
@@ -213,6 +218,8 @@ export interface OutingRecord {
   id: string;
   user_id: string;
   outing_date: string;
+  outing_time: string | null;  // HH:MM
+  outing_type: string | null;  // 公出 | 出差
   destination: string;
   leave_type_id: string | null;
   note: string | null;

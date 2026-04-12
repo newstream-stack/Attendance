@@ -2,13 +2,15 @@ import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } f
 import { getBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
-  listPendingForApprover, updateRequestStatus, createApproval, CreateLeaveRequestData,
+  listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
+  createApproval, CreateLeaveRequestData,
 } from '../repositories/leaveRequest.repository';
-import { listUsers } from '../repositories/user.repository';
+import { listUsers, findUserById } from '../repositories/user.repository';
 import { calculateWorkingMinutes } from '../utils/workingDays';
 import { calcAnnualLeaveDays, daysToMins } from '../utils/annualLeave';
 import { AppError } from '../middleware/errorHandler';
 import { LeaveType } from '../types';
+import { sendProxyRequestEmail, sendProxyRejectionEmail } from '../utils/email';
 
 // ─── Leave Types ─────────────────────────────────────────────────────────────
 
@@ -140,9 +142,26 @@ export async function submitLeaveRequest(data: {
     half_day: data.halfDay,
     half_day_period: data.halfDayPeriod ?? null,
     reason: data.reason ?? null,
+    proxy_status: data.workProxyUserId ? 'pending' : null,
   };
 
-  return createLeaveRequest(payload);
+  const leaveReq = await createLeaveRequest(payload);
+
+  // Send email to proxy if set
+  if (data.workProxyUserId) {
+    const [proxy, requester] = await Promise.all([
+      findUserById(data.workProxyUserId),
+      findUserById(data.userId),
+    ]);
+    if (proxy && requester) {
+      const startStr = data.startTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+      const endStr = data.endTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+      sendProxyRequestEmail(proxy.email, proxy.full_name, requester.full_name, leaveType.name_zh, startStr, endStr)
+        .catch((e) => console.error('[email] proxy request email failed:', e));
+    }
+  }
+
+  return leaveReq;
 }
 
 export async function getMyLeaveRequests(userId: string) {
@@ -177,6 +196,37 @@ export async function rejectLeaveRequest(requestId: string, approverId: string, 
 
   await updateRequestStatus(requestId, 'rejected');
   await createApproval({ leave_request_id: requestId, approver_id: approverId, level: 1, action: 'rejected', comment });
+}
+
+export async function getPendingProxyRequests(proxyId: string) {
+  return listPendingProxyRequests(proxyId);
+}
+
+export async function proxyApproveLeave(requestId: string, proxyId: string, comment?: string) {
+  const req = await findLeaveRequestById(requestId);
+  if (!req) throw new AppError(404, '找不到請假申請');
+  if (req.work_proxy_user_id !== proxyId) throw new AppError(403, '您不是此申請的代理人');
+  if (req.proxy_status !== 'pending') throw new AppError(400, '此申請已處理');
+  await updateProxyStatus(requestId, 'approved', comment ?? null);
+}
+
+export async function proxyRejectLeave(requestId: string, proxyId: string, comment?: string) {
+  const req = await findLeaveRequestById(requestId);
+  if (!req) throw new AppError(404, '找不到請假申請');
+  if (req.work_proxy_user_id !== proxyId) throw new AppError(403, '您不是此申請的代理人');
+  if (req.proxy_status !== 'pending') throw new AppError(400, '此申請已處理');
+
+  await updateProxyStatus(requestId, 'rejected', comment ?? null);
+  await updateRequestStatus(requestId, 'rejected');
+
+  const [requester, proxy] = await Promise.all([
+    findUserById(req.user_id),
+    findUserById(proxyId),
+  ]);
+  if (requester && proxy) {
+    sendProxyRejectionEmail(requester.email, requester.full_name, proxy.full_name)
+      .catch((e) => console.error('[email] proxy rejection email failed:', e));
+  }
 }
 
 export async function cancelLeaveRequest(requestId: string, userId: string) {

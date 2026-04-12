@@ -38,3 +38,14 @@ export function useDeletePublicHoliday() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['public-holidays'] }),
   })
 }
+
+export function useImportTaiwanHolidays() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (year: number) => {
+      const { data } = await apiClient.post<{ inserted: number }>('/public-holidays/import', { year })
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['public-holidays'] }),
+  })
+}

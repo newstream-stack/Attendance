@@ -9,6 +9,7 @@ import {
   previewAnnualLeave, getAllAnnualBalances,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
   approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest,
+  getPendingProxyRequests, proxyApproveLeave, proxyRejectLeave,
 } from '../services/leave.service';
 
 const router = Router();
@@ -160,6 +161,26 @@ router.post('/requests/:id/reject', requireRole('admin', 'manager'), actionSchem
 router.post('/requests/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await cancelLeaveRequest(req.params.id, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ─── Proxy Approval ───────────────────────────────────────────────────────────
+
+router.get('/requests/proxy-pending', async (req: Request, res: Response, next: NextFunction) => {
+  try { res.json(await getPendingProxyRequests(req.user!.id)); } catch (e) { next(e); }
+});
+
+router.post('/requests/:id/proxy-approve', actionSchema, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await proxyApproveLeave(req.params.id, req.user!.id, req.body.comment);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/requests/:id/proxy-reject', actionSchema, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await proxyRejectLeave(req.params.id, req.user!.id, req.body.comment);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

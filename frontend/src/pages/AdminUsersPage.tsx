@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2 } from 'lucide-react'
+import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import {
   useUsers, useManagers, useCreateUser, useUpdateUser, useToggleUserActive,
-  useAdminResetPassword, useDeleteUser,
+  useAdminResetPassword, useDeleteUser, useSendResetEmail,
   UserRow, CreateUserPayload, UpdateUserPayload,
 } from '@/api/users.api'
 import { useDepartments } from '@/api/departments.api'
@@ -38,10 +38,10 @@ const createSchema = z.object({
   manager_id: z.string().uuid().nullable().optional(),
 })
 
-const editSchema = createSchema.omit({ employee_id: true })
+const editSchema = createSchema
 
 type CreateForm = z.infer<typeof createSchema>
-type EditForm = z.infer<typeof editSchema>
+type EditForm = CreateForm
 
 export default function AdminUsersPage() {
   const { toast } = useToast()
@@ -53,6 +53,17 @@ export default function AdminUsersPage() {
   const toggleActive = useToggleUserActive()
   const resetPassword = useAdminResetPassword()
   const deleteUser = useDeleteUser()
+  const sendResetEmail = useSendResetEmail()
+
+  // 排序：admin 第一，其次依部門（無部門排最後），再依員工編號
+  const sortedUsers = useMemo(() => [...users].sort((a, b) => {
+    if (a.role === 'admin' && b.role !== 'admin') return -1
+    if (b.role === 'admin' && a.role !== 'admin') return 1
+    const da = a.department ?? '\uffff'
+    const db_ = b.department ?? '\uffff'
+    if (da !== db_) return da.localeCompare(db_, 'zh-TW')
+    return (a.employee_id ?? '').localeCompare(b.employee_id ?? '')
+  }), [users])
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<UserRow | null>(null)
@@ -61,6 +72,7 @@ export default function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null)
   const [newPassword, setNewPassword] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [sendEmailTarget, setSendEmailTarget] = useState<UserRow | null>(null)
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -86,6 +98,7 @@ export default function AdminUsersPage() {
   const openEdit = (user: UserRow) => {
     setEditTarget(user)
     editForm.reset({
+      employee_id: user.employee_id,
       email: user.email,
       full_name: user.full_name,
       role: user.role,
@@ -174,7 +187,10 @@ export default function AdminUsersPage() {
           <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="編輯">
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setResetTarget(row)} title="重設密碼">
+          <Button size="sm" variant="ghost" onClick={() => setSendEmailTarget(row)} title="傳送密碼重設信">
+            <Mail className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setResetTarget(row)} title="直接重設密碼">
             <KeyRound className="h-4 w-4" />
           </Button>
           <Button
@@ -210,7 +226,7 @@ export default function AdminUsersPage() {
       </div>
 
       <DataTable
-        data={users as unknown as Record<string, unknown>[]}
+        data={sortedUsers as unknown as Record<string, unknown>[]}
         columns={columns as Column<Record<string, unknown>>[]}
         emptyText={isLoading ? '載入中...' : '尚無員工資料'}
       />
@@ -238,7 +254,7 @@ export default function AdminUsersPage() {
             <DialogTitle>編輯員工 — {editTarget?.full_name}</DialogTitle>
           </DialogHeader>
           <form onSubmit={editForm.handleSubmit(handleEdit)} className="space-y-3">
-            <UserFormFields form={editForm} managers={managers} departments={departments} showEmail />
+            <UserFormFields form={editForm} managers={managers} departments={departments} showEmployeeId showEmail />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditTarget(null)}>取消</Button>
               <Button type="submit" disabled={updateUser.isPending}>
@@ -256,6 +272,22 @@ export default function AdminUsersPage() {
         title={toggleTarget?.is_active ? '停用員工' : '啟用員工'}
         description={`確定要${toggleTarget?.is_active ? '停用' : '啟用'} ${toggleTarget?.full_name}？`}
         onConfirm={handleToggle}
+      />
+
+      {/* Confirm send reset email */}
+      <ConfirmDialog
+        open={!!sendEmailTarget}
+        onOpenChange={(o) => !o && setSendEmailTarget(null)}
+        title="傳送密碼重設信"
+        description={`確定要傳送密碼重設連結至 ${sendEmailTarget?.email}？連結有效期限為 1 小時。`}
+        confirmLabel="傳送"
+        onConfirm={() => {
+          if (!sendEmailTarget) return
+          sendResetEmail.mutate(sendEmailTarget.id, {
+            onSuccess: () => { toast({ title: '密碼重設信已寄出' }); setSendEmailTarget(null) },
+            onError: () => { toast({ variant: 'destructive', title: '傳送失敗' }); setSendEmailTarget(null) },
+          })
+        }}
       />
 
       {/* Confirm reset password */}

@@ -4,7 +4,8 @@ import {
   listUsers, createUser, updateUser, updatePassword, setUserActive, softDeleteUser, listManagers,
   findUserById, UpdateUserData,
 } from '../repositories/user.repository';
-import { sendWelcomeEmail } from '../utils/email';
+import { sendWelcomeEmail, sendPasswordResetEmail } from '../utils/email';
+import { setResetToken } from '../repositories/user.repository';
 import { AppError } from '../middleware/errorHandler';
 import { findUserByEmail, findUserByEmployeeId } from '../repositories/user.repository';
 import { db } from '../config/database';
@@ -52,6 +53,11 @@ export async function editUser(id: string, data: UpdateUserData) {
   const user = await findUserById(id);
   if (!user) throw new AppError(404, '使用者不存在');
 
+  if (data.employee_id && data.employee_id !== user.employee_id) {
+    const existing = await findUserByEmployeeId(data.employee_id);
+    if (existing) throw new AppError(409, '此員工編號已被使用');
+  }
+
   if (data.email && data.email !== user.email) {
     const existing = await findUserByEmail(data.email);
     if (existing) throw new AppError(409, '此 Email 已被使用');
@@ -79,6 +85,15 @@ export async function deleteUser(id: string) {
   const user = await db('users').where({ id }).whereNull('deleted_at').first();
   if (!user) throw new AppError(404, '使用者不存在');
   await softDeleteUser(id);
+}
+
+export async function sendUserResetEmail(id: string): Promise<void> {
+  const user = await findUserById(id);
+  if (!user) throw new AppError(404, '使用者不存在');
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 小時有效
+  await setResetToken(id, token, expires);
+  await sendPasswordResetEmail(user.email, token);
 }
 
 export async function toggleUserActive(id: string, isActive: boolean) {

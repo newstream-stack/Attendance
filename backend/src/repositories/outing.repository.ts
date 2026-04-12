@@ -4,26 +4,24 @@ import { OutingRecord } from '../types';
 export interface OutingRow extends OutingRecord {
   full_name: string;
   employee_id: string;
-  leave_type_name: string | null;
 }
 
 function baseQuery() {
   return db('outing_records as o')
     .join('users as u', 'o.user_id', 'u.id')
-    .leftJoin('leave_types as lt', 'o.leave_type_id', 'lt.id')
     .select(
       'o.*',
       'u.full_name',
       'u.employee_id',
-      'lt.name_zh as leave_type_name',
     );
 }
 
 export async function createOuting(data: {
   user_id: string;
   outing_date: string;
+  outing_time: string | null;
+  outing_type: string | null;
   destination: string;
-  leave_type_id: string | null;
   note: string | null;
 }): Promise<OutingRecord> {
   const [row] = await db<OutingRecord>('outing_records').insert(data).returning('*');

@@ -17,10 +17,10 @@ function formatDuration(mins: number | null) {
 }
 
 function defaultRange() {
+  const fmt = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
   const end = new Date()
   const start = new Date()
-  start.setDate(end.getDate() - 29)
-  const fmt = (d: Date) => d.toLocaleDateString('en-CA')
+  start.setDate(end.getDate() - 6)
   return { start: fmt(start), end: fmt(end) }
 }
 

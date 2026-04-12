@@ -11,10 +11,11 @@ export interface CreateLeaveRequestData {
   half_day: boolean;
   half_day_period?: string | null;
   reason?: string | null;
+  proxy_status?: string | null;
 }
 
 export async function createLeaveRequest(data: CreateLeaveRequestData): Promise<LeaveRequest> {
-  const [row] = await db<LeaveRequest>('leave_requests').insert(data).returning('*');
+  const [row] = await db<LeaveRequest>('leave_requests').insert(data as any).returning('*');
   return row;
 }
 
@@ -37,10 +38,38 @@ export async function listPendingForApprover(approverId: string, isAdmin: boolea
     .join('leave_types as lt', 'lr.leave_type_id', 'lt.id')
     .join('users as u', 'lr.user_id', 'u.id')
     .where('lr.status', 'pending')
+    // Only show after proxy has approved (or no proxy required)
+    .where(function () {
+      this.whereNull('lr.proxy_status').orWhere('lr.proxy_status', 'approved');
+    })
     .select('lr.*', 'lt.name_zh as leave_type_name', 'u.full_name as applicant_name', 'u.employee_id')
     .orderBy('lr.submitted_at', 'asc');
   if (!isAdmin) q.where('u.manager_id', approverId);
   return q;
+}
+
+export async function listPendingProxyRequests(proxyUserId: string): Promise<(LeaveRequest & {
+  leave_type_name: string; applicant_name: string; employee_id: string;
+})[]> {
+  return db('leave_requests as lr')
+    .join('leave_types as lt', 'lr.leave_type_id', 'lt.id')
+    .join('users as u', 'lr.user_id', 'u.id')
+    .where('lr.work_proxy_user_id', proxyUserId)
+    .where('lr.proxy_status', 'pending')
+    .select('lr.*', 'lt.name_zh as leave_type_name', 'u.full_name as applicant_name', 'u.employee_id')
+    .orderBy('lr.submitted_at', 'asc');
+}
+
+export async function updateProxyStatus(
+  id: string,
+  status: string,
+  comment?: string | null,
+): Promise<LeaveRequest> {
+  const [row] = await db<LeaveRequest>('leave_requests')
+    .where({ id })
+    .update({ proxy_status: status as any, proxy_comment: comment ?? null, proxy_acted_at: db.fn.now(), updated_at: db.fn.now() })
+    .returning('*');
+  return row;
 }
 
 export async function updateRequestStatus(
@@ -49,7 +78,7 @@ export async function updateRequestStatus(
 ): Promise<LeaveRequest> {
   const [row] = await db<LeaveRequest>('leave_requests')
     .where({ id })
-    .update({ status, updated_at: db.fn.now() })
+    .update({ status: status as any, updated_at: db.fn.now() })
     .returning('*');
   return row;
 }

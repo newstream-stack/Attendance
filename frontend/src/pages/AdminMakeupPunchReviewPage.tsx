@@ -90,7 +90,7 @@ export default function AdminMakeupPunchReviewPage() {
       <h1 className="text-2xl font-semibold">補打卡審核</h1>
 
       {/* Status filter tabs */}
-      <div className="flex border-b">
+      <div className="flex border-b overflow-x-auto">
         {STATUS_FILTER.map((s) => (
           <button
             key={s}

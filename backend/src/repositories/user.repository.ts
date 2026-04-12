@@ -14,6 +14,7 @@ export interface CreateUserData {
 }
 
 export interface UpdateUserData {
+  employee_id?: string;
   email?: string;
   full_name?: string;
   role?: string;
@@ -78,7 +79,7 @@ export async function listUsers(): Promise<User[]> {
 
 export async function createUser(data: CreateUserData): Promise<User> {
   const [user] = await db<User>('users')
-    .insert({ ...data, must_change_password: true })
+    .insert({ role: data.role as any, must_change_password: true })
     .returning('*');
   return user;
 }
@@ -86,7 +87,7 @@ export async function createUser(data: CreateUserData): Promise<User> {
 export async function updateUser(id: string, data: UpdateUserData): Promise<User> {
   const [user] = await db<User>('users')
     .where({ id })
-    .update({ ...data, updated_at: db.fn.now() })
+    .update({ role: data.role as any, updated_at: db.fn.now() })
     .returning('*');
   return user;
 }

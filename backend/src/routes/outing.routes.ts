@@ -45,8 +45,9 @@ router.post(
   validate({
     body: z.object({
       outing_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      outing_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+      outing_type: z.enum(['公出', '出差']).nullable().optional(),
       destination: z.string().min(1).max(200),
-      leave_type_id: z.string().uuid().nullable().optional(),
       note: z.string().max(500).nullable().optional(),
     }),
   }),
@@ -56,8 +57,9 @@ router.post(
       const result = await submitOuting({
         userId: req.user!.id,
         outing_date: r.outing_date,
+        outing_time: r.outing_time ?? null,
+        outing_type: r.outing_type ?? null,
         destination: r.destination,
-        leave_type_id: r.leave_type_id ?? null,
         note: r.note ?? null,
       });
       res.status(201).json(result);

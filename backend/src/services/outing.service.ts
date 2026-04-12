@@ -6,15 +6,17 @@ import { AppError } from '../middleware/errorHandler';
 export async function submitOuting(data: {
   userId: string;
   outing_date: string;
+  outing_time: string | null;
+  outing_type: string | null;
   destination: string;
-  leave_type_id: string | null;
   note: string | null;
 }) {
   return createOuting({
     user_id: data.userId,
     outing_date: data.outing_date,
+    outing_time: data.outing_time,
+    outing_type: data.outing_type,
     destination: data.destination,
-    leave_type_id: data.leave_type_id,
     note: data.note,
   });
 }

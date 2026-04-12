@@ -5,14 +5,14 @@ export interface OutingRecord {
   id: string
   user_id: string
   outing_date: string
+  outing_time: string | null
+  outing_type: string | null
   destination: string
-  leave_type_id: string | null
   note: string | null
   created_at: string
   // Joined
   full_name?: string
   employee_id?: string
-  leave_type_name?: string | null
 }
 
 export function useMyOutings() {
@@ -51,8 +51,9 @@ export function useSubmitOuting() {
   return useMutation({
     mutationFn: async (payload: {
       outing_date: string
+      outing_time?: string | null
+      outing_type?: string | null
       destination: string
-      leave_type_id?: string | null
       note?: string | null
     }) => {
       const { data } = await apiClient.post<OutingRecord>('/outings', payload)

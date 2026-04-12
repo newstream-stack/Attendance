@@ -53,12 +53,12 @@ export async function upsertClockIn(userId: string, workDate: string, clockInTim
   if (existing) {
     const [record] = await db<AttendanceRecord>('attendance_records')
       .where({ id: existing.id })
-      .update({ clock_in: clockInTime, updated_at: db.fn.now() })
+      .update({ clock_in: clockInTime as any, updated_at: db.fn.now() })
       .returning('*');
     return record;
   }
   const [record] = await db<AttendanceRecord>('attendance_records')
-    .insert({ user_id: userId, work_date: workDate, clock_in: clockInTime, status: 'active' })
+    .insert({ user_id: userId, work_date: workDate, clock_in: clockInTime as any, status: 'active' })
     .returning('*');
   return record;
 }
@@ -70,13 +70,13 @@ export async function updateClockOut(userId: string, workDate: string, clockOutT
     const durationMins = diffMs > 0 ? Math.round(diffMs / 60000) : null;
     const [record] = await db<AttendanceRecord>('attendance_records')
       .where({ id: existing.id })
-      .update({ clock_out: clockOutTime, duration_mins: durationMins, status: 'completed', updated_at: db.fn.now() })
+      .update({ clock_out: clockOutTime as any, duration_mins: durationMins, status: 'completed', updated_at: db.fn.now() })
       .returning('*');
     return record;
   }
   // No clock_in record — insert with only clock_out, duration_mins null
   const [record] = await db<AttendanceRecord>('attendance_records')
-    .insert({ user_id: userId, work_date: workDate, clock_in: clockOutTime, clock_out: clockOutTime, status: 'completed', duration_mins: null })
+    .insert({ user_id: userId, work_date: workDate, clock_in: clockOutTime as any, clock_out: clockOutTime as any, status: 'completed', duration_mins: null })
     .returning('*');
   return record;
 }

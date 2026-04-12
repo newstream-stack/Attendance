@@ -104,8 +104,8 @@ export function DataTable<T extends Record<string, unknown>>({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
-          <span>共 {sorted.length} 筆，第 {page} / {totalPages} 頁</span>
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-2 text-sm text-slate-500">
+          <span className="text-xs sm:text-sm">共 {sorted.length} 筆，第 {page} / {totalPages} 頁</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
               上一頁

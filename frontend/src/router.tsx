@@ -30,6 +30,8 @@ import AdminSystemSettingsPage from '@/pages/AdminSystemSettingsPage'
 import AdminPublicHolidaysPage from '@/pages/AdminPublicHolidaysPage'
 import OutingPage from '@/pages/OutingPage'
 import AdminOutingsPage from '@/pages/AdminOutingsPage'
+import HolidayCalendarPage from '@/pages/HolidayCalendarPage'
+import ProxyReviewPage from '@/pages/ProxyReviewPage'
 
 function PrivateRoute() {
   const { user, isLoading } = useAuthStore()
@@ -103,6 +105,8 @@ export const router = createBrowserRouter([
       { path: '/admin/public-holidays', element: <AdminPublicHolidaysPage /> },
       { path: '/outing', element: <OutingPage /> },
       { path: '/admin/outings', element: <AdminOutingsPage /> },
+      { path: '/holidays', element: <HolidayCalendarPage /> },
+      { path: '/leave/proxy-review', element: <ProxyReviewPage /> },
     ],
   },
 ])

@@ -34,6 +34,7 @@ export interface CreateUserPayload {
 }
 
 export interface UpdateUserPayload {
+  employee_id?: string
   email?: string
   full_name?: string
   role?: 'admin' | 'manager' | 'employee'
@@ -68,6 +69,14 @@ export interface ColleagueOption {
   full_name: string
   employee_id: string
   role: string
+}
+
+export function useSendResetEmail() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.post(`/users/${id}/send-reset-email`)
+    },
+  })
 }
 
 export function useColleagues() {

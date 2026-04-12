@@ -12,20 +12,24 @@ import { DataTable, Column } from '@/components/shared/DataTable'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useMyOutings, useSubmitOuting, useDeleteOuting, OutingRecord } from '@/api/outing.api'
-import { useLeaveTypes } from '@/api/leave.api'
 
 const schema = z.object({
   outing_date: z.string().min(1, '請選擇外出日期'),
+  outing_time: z.string().optional(),
+  outing_type: z.string().optional(),
   destination: z.string().min(1, '請填寫外出地點').max(200),
-  leave_type_id: z.string().optional(),
   note: z.string().max(500).optional(),
 })
 type FormData = z.infer<typeof schema>
 
+function fmtTime(t: string | null | undefined) {
+  if (!t) return '—'
+  return t.slice(0, 5) // HH:MM:SS → HH:MM
+}
+
 export default function OutingPage() {
   const { toast } = useToast()
   const { data: outings = [], isLoading } = useMyOutings()
-  const { data: leaveTypes = [] } = useLeaveTypes()
   const submit = useSubmitOuting()
   const deleteOuting = useDeleteOuting()
   const [deleteTarget, setDeleteTarget] = useState<OutingRecord | null>(null)
@@ -34,19 +38,20 @@ export default function OutingPage() {
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { outing_date: today, destination: '', leave_type_id: 'none', note: '' },
+    defaultValues: { outing_date: today, outing_time: '', outing_type: 'none', destination: '', note: '' },
   })
 
   const onSubmit = (data: FormData) => {
     submit.mutate({
       outing_date: data.outing_date,
+      outing_time: data.outing_time || null,
+      outing_type: data.outing_type === 'none' ? null : (data.outing_type ?? null),
       destination: data.destination,
-      leave_type_id: data.leave_type_id === 'none' ? null : (data.leave_type_id ?? null),
       note: data.note || null,
     }, {
       onSuccess: () => {
         toast({ title: '外出單已送出' })
-        reset({ outing_date: today, destination: '', leave_type_id: 'none', note: '' })
+        reset({ outing_date: today, outing_time: '', outing_type: 'none', destination: '', note: '' })
       },
       onError: () => toast({ title: '送出失敗', variant: 'destructive' }),
     })
@@ -57,8 +62,9 @@ export default function OutingPage() {
       key: 'outing_date', header: '外出日期', sortable: true,
       render: (r) => new Date(r.outing_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
     },
+    { key: 'outing_time', header: '時間', render: (r) => fmtTime(r.outing_time) },
+    { key: 'outing_type', header: '項目', render: (r) => r.outing_type ?? '—' },
     { key: 'destination', header: '外出地點' },
-    { key: 'leave_type_name', header: '假別', render: (r) => r.leave_type_name ?? '—' },
     { key: 'note', header: '備註', render: (r) => r.note ?? '—' },
     {
       key: 'actions', header: '',
@@ -82,31 +88,33 @@ export default function OutingPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <FormField label="外出日期" error={errors.outing_date?.message} required>
-              <Input type="date" {...register('outing_date')} />
+              <div className="flex gap-2 flex-wrap items-center">
+                <Input type="date" className="flex-1 min-w-[140px]" {...register('outing_date')} />
+                <Input type="time" className="w-32" {...register('outing_time')} />
+              </div>
             </FormField>
 
-            <FormField label="外出地點" error={errors.destination?.message} required>
-              <Input placeholder="例如：台北市信義區客戶辦公室" {...register('destination')} />
-            </FormField>
-
-            <FormField label="假別" error={errors.leave_type_id?.message}>
+            <FormField label="項目">
               <Controller
                 control={control}
-                name="leave_type_id"
+                name="outing_type"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="請選擇假別（選填）" />
+                      <SelectValue placeholder="請選擇項目（選填）" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">不選擇</SelectItem>
-                      {leaveTypes.map((lt) => (
-                        <SelectItem key={lt.id} value={lt.id}>{lt.name_zh}</SelectItem>
-                      ))}
+                      <SelectItem value="公出">公出</SelectItem>
+                      <SelectItem value="出差">出差</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               />
+            </FormField>
+
+            <FormField label="外出地點" error={errors.destination?.message} required>
+              <Input placeholder="例如：台北市信義區客戶辦公室" {...register('destination')} />
             </FormField>
 
             <FormField label="備註" error={errors.note?.message}>

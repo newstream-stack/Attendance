@@ -56,7 +56,10 @@ export default function LeaveApplyPage() {
         work_proxy_user_id: data.work_proxy_user_id ?? null,
         reason: data.reason || null,
       })
-      toast({ title: '請假申請已送出', description: '等待主管審核' })
+      toast({
+        title: '請假申請已送出',
+        description: data.work_proxy_user_id ? '等待代理人確認後，再進入主管審核' : '等待主管審核',
+      })
       navigate('/leave/history')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })
