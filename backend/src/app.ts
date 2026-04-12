@@ -26,7 +26,7 @@ app.use(helmet());
 // CORS — allow frontend dev origin with credentials
 app.use(
   cors({
-    origin: ['http://localhost:3000'],
+    origin: process.env.CORS_ORIGIN || true, // true 代表允許當前發送請求的來源
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
