@@ -5,11 +5,9 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc || echo 'ignoring errors'",
-    "start": "node dist/server.js",
-    "migrate": "knex --knexfile src/config/knexfile.ts migrate:latest",
-    "migrate:make": "knex --knexfile src/config/knexfile.ts migrate:make",
-    "migrate:rollback": "knex --knexfile src/config/knexfile.ts migrate:rollback"
+    "build": "tsc",
+    "start": "npm run migrate && node dist/server.js",
+    "migrate": "npx knex --knexfile src/config/knexfile.ts migrate:latest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
