@@ -5,8 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
-    "start": "npm run migrate && node dist/server.js",
+    "build": "tsc && tsc --project tsconfig.migrations.json",
+    "start": "npx knex --knexfile dist/config/knexfile.js migrate:latest && node dist/server.js",
     "migrate": "npx knex --knexfile src/config/knexfile.ts migrate:latest"
   },
   "dependencies": {
@@ -19,7 +19,6 @@
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "nodemailer": "^6.9.14",
-    "ts-node": "^10.9.2",
     "pg": "^8.12.0",
     "zod": "^3.23.8"
   },
