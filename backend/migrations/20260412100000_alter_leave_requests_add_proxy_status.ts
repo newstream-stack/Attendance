@@ -1,11 +1,14 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.alterTable('leave_requests', (t) => {
-    t.string('proxy_status', 20).nullable();   // pending | approved | rejected
-    t.text('proxy_comment').nullable();
-    t.timestamp('proxy_acted_at', { useTz: true }).nullable();
-  });
+  const hasProxyStatus = await knex.schema.hasColumn('leave_requests', 'proxy_status');
+  if (!hasProxyStatus) {
+    await knex.schema.alterTable('leave_requests', (t) => {
+      t.string('proxy_status', 20).nullable();
+      t.text('proxy_comment').nullable();
+      t.timestamp('proxy_acted_at', { useTz: true }).nullable();
+    });
+  }
 }
 
 export async function down(knex: Knex): Promise<void> {

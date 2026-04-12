@@ -1,7 +1,7 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.createTable('outing_records', (t) => {
+  await knex.schema.createTableIfNotExists('outing_records', (t) => {
     t.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     t.uuid('user_id').notNullable().references('id').inTable('users');
     t.date('outing_date').notNullable();
