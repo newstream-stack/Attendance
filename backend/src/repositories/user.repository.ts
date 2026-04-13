@@ -79,15 +79,36 @@ export async function listUsers(): Promise<User[]> {
 
 export async function createUser(data: CreateUserData): Promise<User> {
   const [user] = await db<User>('users')
-    .insert({ role: data.role as any, must_change_password: true })
+    .insert({
+      employee_id: data.employee_id,
+      email: data.email,
+      password_hash: data.password_hash,
+      full_name: data.full_name,
+      role: data.role as any,
+      department: data.department ?? null,
+      position: data.position ?? null,
+      hire_date: data.hire_date,
+      manager_id: data.manager_id ?? null,
+      must_change_password: true,
+    })
     .returning('*');
   return user;
 }
 
 export async function updateUser(id: string, data: UpdateUserData): Promise<User> {
+  const updates: Record<string, unknown> = { updated_at: db.fn.now() };
+  if (data.employee_id !== undefined) updates.employee_id = data.employee_id;
+  if (data.email !== undefined) updates.email = data.email;
+  if (data.full_name !== undefined) updates.full_name = data.full_name;
+  if (data.role !== undefined) updates.role = data.role;
+  if (data.department !== undefined) updates.department = data.department;
+  if (data.position !== undefined) updates.position = data.position;
+  if (data.hire_date !== undefined) updates.hire_date = data.hire_date;
+  if (data.manager_id !== undefined) updates.manager_id = data.manager_id;
+
   const [user] = await db<User>('users')
     .where({ id })
-    .update({ role: data.role as any, updated_at: db.fn.now() })
+    .update(updates)
     .returning('*');
   return user;
 }
