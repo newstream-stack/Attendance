@@ -48,8 +48,8 @@ export default function LoginPage() {
         localStorage.removeItem(REMEMBER_EMAIL_KEY)
         localStorage.removeItem(REMEMBER_PASSWORD_KEY)
       }
-      await login(data.email, data.password)
-      navigate('/dashboard')
+      const loggedInUser = await login(data.email, data.password)
+      navigate(loggedInUser.role === 'admin' ? '/admin/reports' : '/dashboard')
     } catch {
       toast({ variant: 'destructive', title: '登入失敗', description: 'Email 或密碼不正確' })
     } finally {
