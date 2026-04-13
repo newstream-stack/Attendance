@@ -9,6 +9,12 @@ function getTaipeiDateString(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }); // YYYY-MM-DD
 }
 
+function recomputeDuration(record: { clock_in: Date | string; clock_out: Date | string | null; duration_mins: number | null }) {
+  if (!record.clock_out) return record.duration_mins;
+  const diffMs = new Date(record.clock_out).getTime() - new Date(record.clock_in).getTime();
+  return diffMs > 0 ? Math.round(diffMs / 60000) : record.duration_mins;
+}
+
 export async function clockInService(userId: string, ipAddress: string) {
   // IP whitelist check
   const allowed = await findAllowedIpByAddress(ipAddress);
@@ -45,7 +51,9 @@ export async function clockOutService(userId: string) {
 
 export async function getTodayRecord(userId: string) {
   const workDate = getTaipeiDateString();
-  return findTodayRecord(userId, workDate);
+  const record = await findTodayRecord(userId, workDate);
+  if (!record) return record;
+  return { ...record, duration_mins: recomputeDuration(record) };
 }
 
 export async function getMyHistory(userId: string, startDate: string, endDate: string) {
@@ -75,10 +83,11 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
       early_leave_mins = diff > 0 ? diff : null;
     }
 
-    return { ...r, late_mins, early_leave_mins };
+    return { ...r, duration_mins: recomputeDuration(r), late_mins, early_leave_mins };
   });
 }
 
 export async function getAllHistory(startDate: string, endDate: string) {
-  return listAllRecords(startDate, endDate);
+  const records = await listAllRecords(startDate, endDate);
+  return records.map((r) => ({ ...r, duration_mins: recomputeDuration(r) }));
 }

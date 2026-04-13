@@ -120,7 +120,13 @@ router.get(
           const diff = endMins - toTaipeiMins(r.clock_out);
           if (diff > 0) early_leave_mins = diff;
         }
-        return { ...r, late_mins, early_leave_mins };
+        // Recompute duration from actual timestamps to fix any stale stored values
+        let duration_mins = r.duration_mins;
+        if (r.clock_in && r.clock_out) {
+          const diffMs = new Date(r.clock_out).getTime() - new Date(r.clock_in).getTime();
+          if (diffMs > 0) duration_mins = Math.round(diffMs / 60000);
+        }
+        return { ...r, duration_mins, late_mins, early_leave_mins };
       });
 
       if (req.query.format === 'csv') {
