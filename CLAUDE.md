@@ -8,7 +8,7 @@ Lang: zh-TW
 - **Backend**: Node.js 20, Express, TypeScript, Knex.js (query builder only, no ORM)
 - **DB**: PostgreSQL 16
 - **Auth**: JWT access token (15m, in-memory) + Refresh Token (7d, httpOnly cookie)
-- **Other**: MailHog (local email interception)
+- **Email**: Resend API (`resend` npm package, `RESEND_API_KEY` env var, `SMTP_FROM` env var)
 
 ## Commands
 
@@ -35,7 +35,7 @@ cd backend && npm run migrate:rollback
 cd frontend && npm run lint
 ```
 
-> **Today's date is 2026-04-09.**
+> **Today's date is 2026-04-13.**
 
 ## Architecture
 
@@ -78,9 +78,13 @@ hooks/useAuth.ts        — Convenience wrapper over authStore + logout
 3. On 401, Axios interceptor calls `/auth/refresh` (sends cookie automatically), retries original request
 4. On refresh failure → clears token, redirects to `/login`
 5. First login forces password change (`must_change_password` flag) — router redirects to `/change-password`
+6. After login: `admin` role redirects to `/admin/reports`; all other roles redirect to `/dashboard`
 
 ### RBAC
 Three roles: `admin` > `manager` > `employee`. Backend enforces via `requireRole()` middleware. Frontend conditionally renders nav items and UI elements based on `user.role` from authStore.
+
+### Attendance Duration Calculation
+`duration_mins` always deducts the lunch break overlap (12:30–13:30, hardcoded in `backend/src/utils/workingDays.ts`). This applies to clock-out, admin clock-in edits, and all report queries. Duration is recomputed from raw timestamps — never trusted from stored values — when generating reports or updating records.
 
 ## Constraints (Behavior Rules)
 - NEVER explain code or logic unless explicitly asked.
