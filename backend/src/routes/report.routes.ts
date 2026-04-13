@@ -80,15 +80,22 @@ router.get(
       const [eh, em] = settings.work_end_time.split(':').map(Number);
       const endMins = eh * 60 + em;
 
-      const enriched = rows.map((r: Record<string, unknown>) => {
+      type AttRow = {
+        user_id: string; employee_id: string; full_name: string; department: string | null;
+        work_date: string; clock_in: string | null; clock_out: string | null;
+        duration_mins: number | null; status: string; is_late: boolean;
+        late_mins: number | null; early_leave_mins: number | null;
+      };
+
+      const enriched: AttRow[] = (rows as Omit<AttRow, 'late_mins' | 'early_leave_mins'>[]).map(r => {
         let late_mins: number | null = null;
         if (r.clock_in) {
-          const diff = toTaipeiMins(r.clock_in as string) - startMins;
+          const diff = toTaipeiMins(r.clock_in) - startMins;
           if (diff > 0) late_mins = diff;
         }
         let early_leave_mins: number | null = null;
         if (r.clock_out) {
-          const diff = endMins - toTaipeiMins(r.clock_out as string);
+          const diff = endMins - toTaipeiMins(r.clock_out);
           if (diff > 0) early_leave_mins = diff;
         }
         return { ...r, late_mins, early_leave_mins };
@@ -105,9 +112,9 @@ router.get(
         const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null }[];
 
         // 建立 attendance map: `${user_id}_${work_date}` → row
-        const attMap = new Map<string, Record<string, unknown>>();
+        const attMap = new Map<string, AttRow>();
         for (const r of enriched) {
-          const dateStr = new Date(r.work_date as string).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+          const dateStr = new Date(r.work_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
           attMap.set(`${r.user_id}_${dateStr}`, r);
         }
 
@@ -150,11 +157,11 @@ router.get(
 
             if (att) {
               status = '出勤';
-              clockIn = att.clock_in ? fmtTime(att.clock_in as string) : '';
-              clockOut = att.clock_out ? fmtTime(att.clock_out as string) : '';
+              clockIn = att.clock_in ? fmtTime(att.clock_in) : '';
+              clockOut = att.clock_out ? fmtTime(att.clock_out) : '';
               durationMins = att.duration_mins ?? '';
-              lateMins = (att.late_mins as number | null) ?? '';
-              earlyMins = (att.early_leave_mins as number | null) ?? '';
+              lateMins = att.late_mins ?? '';
+              earlyMins = att.early_leave_mins ?? '';
               if (dayLeave) {
                 leaveType = dayLeave.leave_type;
                 leaveMins = dayLeave.duration_mins ?? '';
