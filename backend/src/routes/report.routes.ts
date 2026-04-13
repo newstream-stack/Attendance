@@ -271,7 +271,7 @@ router.get(
       const end = `${year}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
       const [leaveTypes, employees, settings] = await Promise.all([
-        db('leave_types').whereNull('deleted_at').orderBy('name_zh').select('id', 'name_zh'),
+        db('leave_types').where('is_active', true).orderBy('name_zh').select('id', 'name_zh'),
         db('users').whereNull('deleted_at').where('role', '!=', 'admin').orderBy('department').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department'),
         getSettings(),
       ]);
