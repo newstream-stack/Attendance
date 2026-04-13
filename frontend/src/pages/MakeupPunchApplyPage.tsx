@@ -87,7 +87,7 @@ export default function MakeupPunchApplyPage() {
               <Textarea placeholder="請說明補打卡原因" rows={3} {...register('reason')} />
             </FormField>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>取消</Button>
               <Button type="submit" disabled={submit.isPending}>
                 {submit.isPending ? '送出中...' : '送出申請'}

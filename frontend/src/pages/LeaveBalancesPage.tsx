@@ -26,7 +26,7 @@ export default function LeaveBalancesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">假期餘額</h1>
         <select
           className="rounded-md border border-input px-3 py-1.5 text-sm"

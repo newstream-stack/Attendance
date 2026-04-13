@@ -101,7 +101,7 @@ export default function OvertimeApplyPage() {
             <FormField label="加班日期" error={errors.work_date} required>
               <Input type="date" {...register('work_date')} />
             </FormField>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField label="開始時間" error={errors.start_time} required>
                 <Input type="time" {...register('start_time')} />
               </FormField>
@@ -126,7 +126,7 @@ export default function OvertimeApplyPage() {
               />
               <span className="text-sm">核准後轉補休假（自動加入補休餘額）</span>
             </label>
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>取消</Button>
               <Button type="submit" disabled={submitRequest.isPending}>
                 {submitRequest.isPending ? '送出中...' : '送出申請'}

@@ -100,7 +100,7 @@ export default function ProxyPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">代理人設定</h1>
           <p className="text-sm text-muted-foreground mt-1">設定不在時由誰代為處理簽核</p>
@@ -135,7 +135,7 @@ export default function ProxyPage() {
                 </Select>
               )} />
             </FormField>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField label="開始日" error={errors.start_date} required>
                 <Input type="date" {...register('start_date')} />
               </FormField>

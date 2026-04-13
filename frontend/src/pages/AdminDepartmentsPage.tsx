@@ -98,7 +98,7 @@ export default function AdminDepartmentsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">部門管理</h1>
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4 mr-1" />新增部門

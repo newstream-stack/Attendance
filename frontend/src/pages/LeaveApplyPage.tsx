@@ -92,7 +92,7 @@ export default function LeaveApplyPage() {
               />
             </FormField>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField label="開始日期" error={errors.start_time} required>
                 <Input type="date" {...register('start_time')} />
               </FormField>
@@ -159,7 +159,7 @@ export default function LeaveApplyPage() {
               />
             </FormField>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>取消</Button>
               <Button type="submit" disabled={submitLeave.isPending}>
                 {submitLeave.isPending ? '送出中...' : '送出申請'}
