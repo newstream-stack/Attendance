@@ -64,6 +64,7 @@ router.get(
         .join('users as u', 'a.user_id', 'u.id')
         .whereBetween('a.work_date', [start, end])
         .whereNull('u.deleted_at')
+        .where('u.role', '!=', 'admin')
         .select(
           'u.id as user_id', 'u.employee_id', 'u.full_name', 'u.department',
           'a.work_date', 'a.clock_in', 'a.clock_out',
@@ -106,7 +107,7 @@ router.get(
         const dates = workdaysInRange(start, end);
 
         // 取得所有員工（含被篩選的特定員工）
-        const empQ = db('users').whereNull('deleted_at').orderBy('department').orderBy('full_name')
+        const empQ = db('users').whereNull('deleted_at').where('role', '!=', 'admin').orderBy('department').orderBy('full_name')
           .select('id', 'employee_id', 'full_name', 'department');
         if (user_id) empQ.where('id', user_id);
         const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null }[];
@@ -271,7 +272,7 @@ router.get(
 
       const [leaveTypes, employees, settings] = await Promise.all([
         db('leave_types').whereNull('deleted_at').orderBy('name_zh').select('id', 'name_zh'),
-        db('users').whereNull('deleted_at').orderBy('department').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department'),
+        db('users').whereNull('deleted_at').where('role', '!=', 'admin').orderBy('department').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department'),
         getSettings(),
       ]);
 
@@ -279,11 +280,13 @@ router.get(
         db('attendance_records as a')
           .join('users as u', 'a.user_id', 'u.id')
           .whereNull('u.deleted_at')
+          .where('u.role', '!=', 'admin')
           .whereBetween('a.work_date', [start, end])
           .select('a.user_id', 'a.clock_in', 'a.clock_out'),
         db('leave_requests as lr')
           .join('users as u', 'lr.user_id', 'u.id')
           .whereNull('u.deleted_at')
+          .where('u.role', '!=', 'admin')
           .where('lr.status', 'approved')
           .whereRaw('lr.start_time::date <= ?', [end])
           .whereRaw('lr.end_time::date >= ?', [start])
