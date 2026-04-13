@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { db } from '../config/database';
+import { getSettings } from '../repositories/systemSettings.repository';
 
 const router = Router();
 router.use(authMiddleware, requireRole('admin', 'manager'));
@@ -37,11 +38,33 @@ router.get(
         q.where('a.user_id', user_id);
       }
 
-      const rows = await q;
+      const [rows, settings] = await Promise.all([q, getSettings()]);
+
+      const [sh, sm] = settings.work_start_time.split(':').map(Number);
+      const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+      const [eh, em] = settings.work_end_time.split(':').map(Number);
+      const endMins = eh * 60 + em;
+
+      const enriched = rows.map((r: Record<string, unknown>) => {
+        let late_mins: number | null = null;
+        if (r.is_late && r.clock_in) {
+          const d = new Date(r.clock_in as string);
+          const mins = d.getHours() * 60 + d.getMinutes();
+          late_mins = Math.max(0, mins - startMins);
+        }
+        let early_leave_mins: number | null = null;
+        if (r.clock_out) {
+          const d = new Date(r.clock_out as string);
+          const mins = d.getHours() * 60 + d.getMinutes();
+          const diff = endMins - mins;
+          if (diff > 0) early_leave_mins = diff;
+        }
+        return { ...r, late_mins, early_leave_mins };
+      });
 
       if (req.query.format === 'csv') {
-        const headers = ['姓名', '部門', '日期', '上班', '下班', '工時(分)', '狀態', '遲到'];
-        const csvRows = rows.map((r: Record<string, unknown>) => [
+        const headers = ['姓名', '部門', '日期', '上班', '下班', '工時(分)', '狀態', '遲到', '遲到(分)', '早退(分)'];
+        const csvRows = enriched.map((r: Record<string, unknown>) => [
           r.full_name,
           r.department ?? '',
           r.work_date,
@@ -50,6 +73,8 @@ router.get(
           r.duration_mins ?? '',
           r.status,
           r.is_late ? '是' : '否',
+          r.late_mins ?? '',
+          r.early_leave_mins ?? '',
         ].map(String).join(','));
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -57,7 +82,7 @@ router.get(
         return res.send('\uFEFF' + [headers.join(','), ...csvRows].join('\n'));
       }
 
-      res.json(rows);
+      res.json(enriched);
     } catch (e) { next(e); }
   },
 );

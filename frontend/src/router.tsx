@@ -51,7 +51,7 @@ function PrivateRoute() {
 function PublicRoute() {
   const { user, isLoading } = useAuthStore()
   if (isLoading) return <PageSkeleton />
-  if (user) return <Navigate to={user.role === 'admin' ? '/leave/approvals' : '/dashboard'} replace />
+  if (user) return <Navigate to={user.role === 'admin' ? '/admin/reports' : '/dashboard'} replace />
   return (
     <PublicLayout>
       <Outlet />
@@ -62,7 +62,7 @@ function PublicRoute() {
 function RootRedirect() {
   const { user, isLoading } = useAuthStore()
   if (isLoading) return <PageSkeleton />
-  return <Navigate to={user?.role === 'admin' ? '/leave/approvals' : '/dashboard'} replace />
+  return <Navigate to={user?.role === 'admin' ? '/admin/reports' : '/dashboard'} replace />
 }
 
 export const router = createBrowserRouter([

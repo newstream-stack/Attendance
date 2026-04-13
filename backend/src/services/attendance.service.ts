@@ -49,7 +49,31 @@ export async function getTodayRecord(userId: string) {
 }
 
 export async function getMyHistory(userId: string, startDate: string, endDate: string) {
-  return listRecords(userId, startDate, endDate);
+  const [records, settings] = await Promise.all([
+    listRecords(userId, startDate, endDate),
+    getSettings(),
+  ]);
+
+  const [sh, sm] = settings.work_start_time.split(':').map(Number);
+  const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+  const [eh, em] = settings.work_end_time.split(':').map(Number);
+  const endMins = eh * 60 + em;
+
+  return records.map((r) => {
+    const clockInDate = new Date(r.clock_in);
+    const clockInMins = clockInDate.getHours() * 60 + clockInDate.getMinutes();
+    const late_mins = r.is_late ? Math.max(0, clockInMins - startMins) : null;
+
+    let early_leave_mins: number | null = null;
+    if (r.clock_out) {
+      const clockOutDate = new Date(r.clock_out);
+      const clockOutMins = clockOutDate.getHours() * 60 + clockOutDate.getMinutes();
+      const diff = endMins - clockOutMins;
+      early_leave_mins = diff > 0 ? diff : null;
+    }
+
+    return { ...r, late_mins, early_leave_mins };
+  });
 }
 
 export async function getAllHistory(startDate: string, endDate: string) {

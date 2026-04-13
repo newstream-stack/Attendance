@@ -21,6 +21,8 @@ interface AttendanceRow {
   duration_mins: number | null
   status: string
   is_late: boolean
+  late_mins: number | null
+  early_leave_mins: number | null
 }
 
 interface LeaveRow {
@@ -141,10 +143,18 @@ export default function AdminReportsPage() {
     { key: 'duration_mins', header: '工時', render: (r) => fmtMins(r.duration_mins) },
     { key: 'status', header: '狀態', render: (r) => <StatusBadge status={r.status as never} /> },
     {
-      key: 'is_late', header: '遲到',
-      render: (r) => r.is_late
-        ? <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">遲到</span>
-        : <span className="text-slate-400">—</span>,
+      key: 'is_late', header: '遲到/早退',
+      render: (r) => {
+        const late = r.late_mins != null ? fmtMins(r.late_mins) : null
+        const early = r.early_leave_mins != null ? fmtMins(r.early_leave_mins) : null
+        if (!late && !early) return <span className="text-slate-400">—</span>
+        return (
+          <div className="flex flex-col gap-0.5">
+            {late && <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">遲到 {late}</span>}
+            {early && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">早退 {early}</span>}
+          </div>
+        )
+      },
     },
   ]
 

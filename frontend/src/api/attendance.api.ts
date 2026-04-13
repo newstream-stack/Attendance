@@ -11,6 +11,9 @@ export interface AttendanceRecord {
   status: 'active' | 'completed' | 'amended'
   ip_address: string | null
   note: string | null
+  is_late: boolean
+  late_mins: number | null
+  early_leave_mins: number | null
   created_at: string
   updated_at: string
   // joined fields (history/all)

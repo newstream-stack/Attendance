@@ -16,6 +16,13 @@ function formatDuration(mins: number | null) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
+function formatOffMins(mins: number | null) {
+  if (mins == null) return null
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return h > 0 ? `${h}時${m > 0 ? `${m}分` : ''}` : `${m}分`
+}
+
 function defaultRange() {
   const fmt = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
   const end = new Date()
@@ -49,6 +56,28 @@ export default function AttendanceHistoryPage() {
     {
       key: 'status', header: '狀態',
       render: (r) => <StatusBadge status={r.status} />,
+    },
+    {
+      key: 'is_late', header: '遲到/早退',
+      render: (r) => {
+        const late = r.late_mins != null ? formatOffMins(r.late_mins) : null
+        const early = r.early_leave_mins != null ? formatOffMins(r.early_leave_mins) : null
+        if (!late && !early) return <span className="text-slate-400">—</span>
+        return (
+          <div className="flex flex-col gap-0.5">
+            {late && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                遲到 {late}
+              </span>
+            )}
+            {early && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                早退 {early}
+              </span>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: 'ip_address', header: 'IP',
