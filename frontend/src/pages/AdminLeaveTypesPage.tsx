@@ -147,7 +147,7 @@ export default function AdminLeaveTypesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <FormField label="年限天數（留空=無限制）" error={form.formState.errors.max_days_per_year}>
-                <Input type="number" min={1} {...form.register('max_days_per_year', { valueAsNumber: true, setValueAs: v => v === '' || isNaN(v) ? null : v })} />
+                <Input type="number" min={1} {...form.register('max_days_per_year', { setValueAs: v => (v === '' || v === null || v === undefined) ? null : (isNaN(Number(v)) ? null : Number(v)) })} />
               </FormField>
               <FormField label="可攜帶天數" error={form.formState.errors.carry_over_days} required>
                 <Input type="number" min={0} {...form.register('carry_over_days', { valueAsNumber: true })} />
