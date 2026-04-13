@@ -52,8 +52,9 @@ router.get(
 
       const enriched = rows.map((r: Record<string, unknown>) => {
         let late_mins: number | null = null;
-        if (r.is_late && r.clock_in) {
-          late_mins = Math.max(0, toTaipeiMins(r.clock_in as string) - startMins);
+        if (r.clock_in) {
+          const diff = toTaipeiMins(r.clock_in as string) - startMins;
+          if (diff > 0) late_mins = diff;
         }
         let early_leave_mins: number | null = null;
         if (r.clock_out) {

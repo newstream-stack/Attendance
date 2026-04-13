@@ -66,7 +66,8 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
 
   return records.map((r) => {
     const clockInMins = toTaipeiMins(r.clock_in);
-    const late_mins = r.is_late ? Math.max(0, clockInMins - startMins) : null;
+    const lateOffset = clockInMins - startMins;
+    const late_mins = lateOffset > 0 ? lateOffset : null;
 
     let early_leave_mins: number | null = null;
     if (r.clock_out) {
