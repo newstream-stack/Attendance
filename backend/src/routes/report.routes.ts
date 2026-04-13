@@ -21,16 +21,36 @@ function toCSV(headers: string[], rows: unknown[][]): string {
   return [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
 }
 
-const rangeSchema = z.object({
-  start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  user_id: z.string().uuid().optional(),
-});
-
 function toTaipeiMins(ts: string): number {
   const d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
   return d.getHours() * 60 + d.getMinutes();
 }
+
+function fmtTime(ts: string): string {
+  return new Date(ts).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Taipei' });
+}
+
+/** 產生 start~end 之間所有工作日（週一到週五）的日期字串陣列 */
+function workdaysInRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const cur = new Date(start + 'T00:00:00');
+  const last = new Date(end + 'T00:00:00');
+  while (cur <= last) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) {
+      dates.push(cur.toLocaleDateString('en-CA'));
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+const rangeSchema = z.object({
+  start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  user_id: z.string().uuid().optional(),
+  format: z.string().optional(),
+});
 
 // GET /api/v1/reports/attendance?start=&end=&user_id=&format=csv
 router.get(
@@ -45,7 +65,7 @@ router.get(
         .whereBetween('a.work_date', [start, end])
         .whereNull('u.deleted_at')
         .select(
-          'u.employee_id', 'u.full_name', 'u.department',
+          'u.id as user_id', 'u.employee_id', 'u.full_name', 'u.department',
           'a.work_date', 'a.clock_in', 'a.clock_out',
           'a.duration_mins', 'a.status', 'a.is_late',
         )
@@ -75,20 +95,86 @@ router.get(
       });
 
       if (req.query.format === 'csv') {
-        const headers = ['員工編號', '姓名', '部門', '日期', '上班', '下班', '工時(分鐘)', '狀態', '遲到', '遲到(分鐘)', '早退(分鐘)'];
-        const csvRows = enriched.map((r: Record<string, unknown>) => [
-          r.employee_id,
-          r.full_name,
-          r.department ?? '',
-          r.work_date,
-          r.clock_in ? new Date(r.clock_in as string).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Taipei' }) : '',
-          r.clock_out ? new Date(r.clock_out as string).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Taipei' }) : '',
-          r.duration_mins ?? '',
-          r.status,
-          (r.late_mins as number | null) != null && (r.late_mins as number) > 0 ? '是' : '否',
-          r.late_mins ?? '',
-          r.early_leave_mins ?? '',
-        ]);
+        // ── 全員 × 每個工作日 的 CSV ──
+        const dates = workdaysInRange(start, end);
+
+        // 取得所有員工（含被篩選的特定員工）
+        const empQ = db('users').whereNull('deleted_at').orderBy('department').orderBy('full_name')
+          .select('id', 'employee_id', 'full_name', 'department');
+        if (user_id) empQ.where('id', user_id);
+        const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null }[];
+
+        // 建立 attendance map: `${user_id}_${work_date}` → row
+        const attMap = new Map<string, Record<string, unknown>>();
+        for (const r of enriched) {
+          const dateStr = new Date(r.work_date as string).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+          attMap.set(`${r.user_id}_${dateStr}`, r);
+        }
+
+        // 取得核准假單
+        const leaveQ = db('leave_requests as lr')
+          .join('leave_types as lt', 'lr.leave_type_id', 'lt.id')
+          .where('lr.status', 'approved')
+          .whereRaw('lr.start_time::date <= ?', [end])
+          .whereRaw('lr.end_time::date >= ?', [start])
+          .select('lr.user_id', 'lt.name_zh as leave_type', 'lr.start_time', 'lr.end_time', 'lr.duration_mins');
+        if (user_id) leaveQ.where('lr.user_id', user_id);
+        const leaveRows = await leaveQ as {
+          user_id: string; leave_type: string;
+          start_time: string; end_time: string; duration_mins: number | null;
+        }[];
+
+        // 建立 leave map: user_id → list of approved leaves
+        const leaveMap = new Map<string, typeof leaveRows>();
+        for (const lr of leaveRows) {
+          if (!leaveMap.has(lr.user_id)) leaveMap.set(lr.user_id, []);
+          leaveMap.get(lr.user_id)!.push(lr);
+        }
+
+        const headers = ['員工編號', '姓名', '部門', '日期', '狀態', '上班時間', '下班時間', '工時(分鐘)', '遲到(分鐘)', '早退(分鐘)', '請假類型', '請假時數(分鐘)'];
+        const csvRows: unknown[][] = [];
+
+        for (const date of dates) {
+          for (const emp of employees) {
+            const att = attMap.get(`${emp.id}_${date}`);
+            const empLeaves = leaveMap.get(emp.id) ?? [];
+            const dayLeave = empLeaves.find(lr => {
+              const ls = new Date(lr.start_time).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+              const le = new Date(lr.end_time).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+              return date >= ls && date <= le;
+            });
+
+            let status: string;
+            let clockIn = '', clockOut = '', durationMins: string | number = '', lateMins: string | number = '', earlyMins: string | number = '';
+            let leaveType = '', leaveMins: string | number = '';
+
+            if (att) {
+              status = '出勤';
+              clockIn = att.clock_in ? fmtTime(att.clock_in as string) : '';
+              clockOut = att.clock_out ? fmtTime(att.clock_out as string) : '';
+              durationMins = att.duration_mins ?? '';
+              lateMins = (att.late_mins as number | null) ?? '';
+              earlyMins = (att.early_leave_mins as number | null) ?? '';
+              if (dayLeave) {
+                leaveType = dayLeave.leave_type;
+                leaveMins = dayLeave.duration_mins ?? '';
+              }
+            } else if (dayLeave) {
+              status = '請假';
+              leaveType = dayLeave.leave_type;
+              leaveMins = dayLeave.duration_mins ?? '';
+            } else {
+              status = '缺勤';
+            }
+
+            csvRows.push([
+              emp.employee_id, emp.full_name, emp.department ?? '',
+              date, status, clockIn, clockOut, durationMins, lateMins, earlyMins,
+              leaveType, leaveMins,
+            ]);
+          }
+        }
+
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="attendance_${start}_${end}.csv"`);
         return res.send('\uFEFF' + toCSV(headers, csvRows));
@@ -108,6 +194,7 @@ router.get(
       end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       user_id: z.string().uuid().optional(),
       leave_type_id: z.string().uuid().optional(),
+      format: z.string().optional(),
     }),
   }),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -177,7 +264,7 @@ router.get(
 
       const [leaveTypes, employees, settings] = await Promise.all([
         db('leave_types').whereNull('deleted_at').orderBy('name_zh').select('id', 'name_zh'),
-        db('users').whereNull('deleted_at').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department'),
+        db('users').whereNull('deleted_at').orderBy('department').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department'),
         getSettings(),
       ]);
 
@@ -214,7 +301,7 @@ router.get(
       };
 
       const empMap = new Map<string, EmpStat>(
-        employees.map((e: { id: string; employee_id: string; full_name: string; department: string | null }) => [e.id, {
+        (employees as { id: string; employee_id: string; full_name: string; department: string | null }[]).map(e => [e.id, {
           employee_id: e.employee_id,
           full_name: e.full_name,
           department: e.department,
