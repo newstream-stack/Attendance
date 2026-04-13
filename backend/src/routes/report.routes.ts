@@ -30,19 +30,40 @@ function fmtTime(ts: string): string {
   return new Date(ts).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Taipei' });
 }
 
-/** 產生 start~end 之間所有工作日（週一到週五）的日期字串陣列 */
+/** 產生 start~end 之間所有工作日（週一到週五）的日期字串陣列，格式 YYYY-MM-DD */
 function workdaysInRange(start: string, end: string): string[] {
   const dates: string[] = [];
-  const cur = new Date(start + 'T00:00:00');
-  const last = new Date(end + 'T00:00:00');
+  // 使用 UTC 正午避免夏令時或時區造成的跨日問題
+  const cur = new Date(start + 'T12:00:00Z');
+  const last = new Date(end + 'T12:00:00Z');
   while (cur <= last) {
-    const dow = cur.getDay();
+    const dow = cur.getUTCDay();
     if (dow !== 0 && dow !== 6) {
-      dates.push(cur.toLocaleDateString('en-CA'));
+      const y = cur.getUTCFullYear();
+      const mo = String(cur.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(cur.getUTCDate()).padStart(2, '0');
+      dates.push(`${y}-${mo}-${d}`);
     }
-    cur.setDate(cur.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return dates;
+}
+
+/** PostgreSQL DATE 欄位（'YYYY-MM-DD' 字串）取前 10 碼 */
+function toDateStr(val: unknown): string {
+  if (typeof val === 'string') return val.substring(0, 10);
+  if (val instanceof Date) {
+    const y = val.getUTCFullYear();
+    const mo = String(val.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(val.getUTCDate()).padStart(2, '0');
+    return `${y}-${mo}-${d}`;
+  }
+  return String(val).substring(0, 10);
+}
+
+/** PostgreSQL TIMESTAMPTZ → 台北時區日期字串 YYYY-MM-DD */
+function tsToTaipeiDate(val: unknown): string {
+  return new Date(val as string).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 }
 
 const rangeSchema = z.object({
@@ -112,11 +133,10 @@ router.get(
         if (user_id) empQ.where('id', user_id);
         const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null }[];
 
-        // 建立 attendance map: `${user_id}_${work_date}` → row
+        // 建立 attendance map: `${user_id}_YYYY-MM-DD` → row
         const attMap = new Map<string, AttRow>();
         for (const r of enriched) {
-          const dateStr = new Date(r.work_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
-          attMap.set(`${r.user_id}_${dateStr}`, r);
+          attMap.set(`${r.user_id}_${toDateStr(r.work_date)}`, r);
         }
 
         // 取得核准假單
@@ -147,8 +167,8 @@ router.get(
             const att = attMap.get(`${emp.id}_${date}`);
             const empLeaves = leaveMap.get(emp.id) ?? [];
             const dayLeave = empLeaves.find(lr => {
-              const ls = new Date(lr.start_time).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
-              const le = new Date(lr.end_time).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+              const ls = tsToTaipeiDate(lr.start_time);
+              const le = tsToTaipeiDate(lr.end_time);
               return date >= ls && date <= le;
             });
 
