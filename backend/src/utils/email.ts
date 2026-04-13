@@ -2,11 +2,10 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env';
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
-  },
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
+  secure: false,
+  auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
 });
 
 export async function sendWelcomeEmail(to: string, fullName: string, tempPassword: string): Promise<void> {
