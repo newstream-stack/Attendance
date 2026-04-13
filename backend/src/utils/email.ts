@@ -55,6 +55,50 @@ export async function sendProxyRejectionEmail(
   });
 }
 
+export async function sendLeaveApprovalRequestEmail(
+  to: string, approverName: string, applicantName: string,
+  leaveTypeName: string, startDate: string, endDate: string, reason?: string | null,
+): Promise<void> {
+  const url = `${env.FRONTEND_URL}/leave/approvals`;
+  await resend.emails.send({
+    from: env.SMTP_FROM,
+    to,
+    subject: `【請假審核】${applicantName} 提出請假申請`,
+    html: `
+      <p>${approverName} 您好，</p>
+      <p>${applicantName} 提交了一份請假申請，請進入系統進行審核：</p>
+      <ul>
+        <li><strong>假別：</strong>${leaveTypeName}</li>
+        <li><strong>期間：</strong>${startDate} ～ ${endDate}</li>
+        ${reason ? `<li><strong>原因：</strong>${reason}</li>` : ''}
+      </ul>
+      <p><a href="${url}">點此進入系統審核</a></p>
+    `,
+  });
+}
+
+export async function sendOvertimeApprovalRequestEmail(
+  to: string, approverName: string, applicantName: string,
+  workDate: string, startTime: string, endTime: string, reason?: string | null,
+): Promise<void> {
+  const url = `${env.FRONTEND_URL}/overtime/approvals`;
+  await resend.emails.send({
+    from: env.SMTP_FROM,
+    to,
+    subject: `【加班審核】${applicantName} 提出加班申請`,
+    html: `
+      <p>${approverName} 您好，</p>
+      <p>${applicantName} 提交了一份加班申請，請進入系統進行審核：</p>
+      <ul>
+        <li><strong>日期：</strong>${workDate}</li>
+        <li><strong>時間：</strong>${startTime} ～ ${endTime}</li>
+        ${reason ? `<li><strong>原因：</strong>${reason}</li>` : ''}
+      </ul>
+      <p><a href="${url}">點此進入系統審核</a></p>
+    `,
+  });
+}
+
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
   const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
 

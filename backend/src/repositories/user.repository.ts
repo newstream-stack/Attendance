@@ -133,3 +133,11 @@ export async function listManagers(): Promise<Pick<User, 'id' | 'full_name' | 'e
     .select('id', 'full_name', 'employee_id')
     .orderBy('full_name');
 }
+
+export async function findFirstAdmin(): Promise<User | undefined> {
+  return db<User>('users')
+    .where({ role: 'admin', is_active: true })
+    .whereNull('deleted_at')
+    .orderBy('created_at', 'asc')
+    .first();
+}

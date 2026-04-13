@@ -5,12 +5,12 @@ import {
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
   createApproval, CreateLeaveRequestData,
 } from '../repositories/leaveRequest.repository';
-import { listUsers, findUserById } from '../repositories/user.repository';
+import { listUsers, findUserById, findFirstAdmin } from '../repositories/user.repository';
 import { calculateWorkingMinutes } from '../utils/workingDays';
 import { calcAnnualLeaveDays, daysToMins } from '../utils/annualLeave';
 import { AppError } from '../middleware/errorHandler';
 import { LeaveType } from '../types';
-import { sendProxyRequestEmail, sendProxyRejectionEmail } from '../utils/email';
+import { sendProxyRequestEmail, sendProxyRejectionEmail, sendLeaveApprovalRequestEmail } from '../utils/email';
 
 // ─── Leave Types ─────────────────────────────────────────────────────────────
 
@@ -156,17 +156,33 @@ export async function submitLeaveRequest(data: {
 
   const leaveReq = await createLeaveRequest(payload);
 
+  const requester = await findUserById(data.userId);
+
   // Send email to proxy if set
   if (data.workProxyUserId) {
-    const [proxy, requester] = await Promise.all([
-      findUserById(data.workProxyUserId),
-      findUserById(data.userId),
-    ]);
+    const proxy = await findUserById(data.workProxyUserId);
     if (proxy && requester) {
       const startStr = data.startTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
       const endStr = data.endTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
       sendProxyRequestEmail(proxy.email, proxy.full_name, requester.full_name, leaveType.name_zh, startStr, endStr)
         .catch((e) => console.error('[email] proxy request email failed:', e));
+    }
+  }
+
+  // Send approval request email to manager or admin
+  if (requester) {
+    const startStr = data.startTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+    const endStr = data.endTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+
+    const approver = requester.manager_id
+      ? await findUserById(requester.manager_id)
+      : await findFirstAdmin();
+
+    if (approver) {
+      sendLeaveApprovalRequestEmail(
+        approver.email, approver.full_name, requester.full_name,
+        leaveType.name_zh, startStr, endStr, data.reason,
+      ).catch((e) => console.error('[email] leave approval request email failed:', e));
     }
   }
 

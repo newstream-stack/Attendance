@@ -4,10 +4,11 @@ import {
 } from '../repositories/overtime.repository';
 import { listLeaveTypes } from '../repositories/leaveType.repository';
 import { getBalance, upsertBalance, addBalance } from '../repositories/leaveBalance.repository';
-import { findUserById } from '../repositories/user.repository';
+import { findUserById, findFirstAdmin } from '../repositories/user.repository';
 import { AppError } from '../middleware/errorHandler';
 import { db } from '../config/database';
 import { deductLunchBreak } from '../utils/workingDays';
+import { sendOvertimeApprovalRequestEmail } from '../utils/email';
 
 export async function submitOvertimeRequest(data: {
   userId: string;
@@ -29,7 +30,7 @@ export async function submitOvertimeRequest(data: {
   const durationMins = deductLunchBreak(startMins, endMins);
   if (durationMins < 30) throw new AppError(400, '加班時間至少 30 分鐘（扣除午休後）');
 
-  return createOvertimeRequest({
+  const req = await createOvertimeRequest({
     user_id: data.userId,
     work_date: data.workDate,
     start_time: data.startTime,
@@ -38,6 +39,26 @@ export async function submitOvertimeRequest(data: {
     reason: data.reason ?? null,
     convert_to_comp: data.convertToComp,
   });
+
+  // Send approval request email to manager or admin
+  const requester = await findUserById(data.userId);
+  if (requester) {
+    const toTaipeiTimeStr = (d: Date) =>
+      d.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+
+    const approver = requester.manager_id
+      ? await findUserById(requester.manager_id)
+      : await findFirstAdmin();
+
+    if (approver) {
+      sendOvertimeApprovalRequestEmail(
+        approver.email, approver.full_name, requester.full_name,
+        data.workDate, toTaipeiTimeStr(data.startTime), toTaipeiTimeStr(data.endTime), data.reason,
+      ).catch((e) => console.error('[email] overtime approval request email failed:', e));
+    }
+  }
+
+  return req;
 }
 
 export async function getMyOvertimeRequests(userId: string) {
