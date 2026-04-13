@@ -1,16 +1,10 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { env } from '../config/env';
 
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: false,
-  requireTLS: true,
-  auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-});
+const resend = new Resend(env.RESEND_API_KEY);
 
 export async function sendWelcomeEmail(to: string, fullName: string, tempPassword: string): Promise<void> {
-  await transporter.sendMail({
+  await resend.emails.send({
     from: env.SMTP_FROM,
     to,
     subject: '歡迎加入出缺勤系統',
@@ -28,7 +22,7 @@ export async function sendProxyRequestEmail(
   to: string, proxyName: string, applicantName: string, leaveTypeName: string, startDate: string, endDate: string,
 ): Promise<void> {
   const url = `${env.FRONTEND_URL}/leave/proxy-review`;
-  await transporter.sendMail({
+  await resend.emails.send({
     from: env.SMTP_FROM,
     to,
     subject: `【代理人確認】${applicantName} 的請假申請`,
@@ -48,7 +42,7 @@ export async function sendProxyRequestEmail(
 export async function sendProxyRejectionEmail(
   to: string, applicantName: string, proxyName: string,
 ): Promise<void> {
-  await transporter.sendMail({
+  await resend.emails.send({
     from: env.SMTP_FROM,
     to,
     subject: '您的請假申請已被代理人拒絕',
@@ -64,7 +58,7 @@ export async function sendProxyRejectionEmail(
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
   const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
 
-  await transporter.sendMail({
+  await resend.emails.send({
     from: env.SMTP_FROM,
     to,
     subject: '密碼重設通知',

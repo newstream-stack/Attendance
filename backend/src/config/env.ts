@@ -20,10 +20,7 @@ export const env = {
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
 
-  SMTP_HOST: process.env.SMTP_HOST ?? 'mailhog',
-  SMTP_PORT: parseInt(process.env.SMTP_PORT ?? '1025', 10),
-  SMTP_USER: process.env.SMTP_USER ?? '',
-  SMTP_PASS: process.env.SMTP_PASS ?? '',
+  RESEND_API_KEY: process.env.RESEND_API_KEY ?? '',
   SMTP_FROM: process.env.SMTP_FROM ?? 'noreply@company.com',
 
   FRONTEND_URL: process.env.FRONTEND_URL ?? 'http://localhost:3000',
