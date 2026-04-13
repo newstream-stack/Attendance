@@ -3,16 +3,24 @@ import {
   findTodayRecord, clockIn, clockOut, listRecords, listAllRecords,
 } from '../repositories/attendance.repository';
 import { getSettings } from '../repositories/systemSettings.repository';
+import { deductLunchBreak } from '../utils/workingDays';
 import { AppError } from '../middleware/errorHandler';
 
 function getTaipeiDateString(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }); // YYYY-MM-DD
 }
 
+function toTaipeiMinutes(ts: Date | string): number {
+  const d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 function recomputeDuration(record: { clock_in: Date | string; clock_out: Date | string | null; duration_mins: number | null }) {
   if (!record.clock_out) return record.duration_mins;
-  const diffMs = new Date(record.clock_out).getTime() - new Date(record.clock_in).getTime();
-  return diffMs > 0 ? Math.round(diffMs / 60000) : record.duration_mins;
+  const startMins = toTaipeiMinutes(record.clock_in);
+  const endMins = toTaipeiMinutes(record.clock_out);
+  const mins = deductLunchBreak(startMins, endMins);
+  return mins > 0 ? mins : record.duration_mins;
 }
 
 export async function clockInService(userId: string, ipAddress: string) {
@@ -43,8 +51,9 @@ export async function clockOutService(userId: string) {
   if (!record) throw new AppError(404, '找不到今日打卡紀錄');
   if (record.status === 'completed') throw new AppError(409, '今日已打卡下班');
 
-  const diffMs = Date.now() - new Date(record.clock_in).getTime();
-  const durationMins = Math.round(diffMs / 60000);
+  const startMins = toTaipeiMinutes(record.clock_in);
+  const endMins = toTaipeiMinutes(new Date());
+  const durationMins = deductLunchBreak(startMins, endMins);
 
   return clockOut(record.id, durationMins);
 }
@@ -67,19 +76,14 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
   const [eh, em] = settings.work_end_time.split(':').map(Number);
   const endMins = eh * 60 + em;
 
-  const toTaipeiMins = (ts: Date | string) => {
-    const d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
-    return d.getHours() * 60 + d.getMinutes();
-  };
-
   return records.map((r) => {
-    const clockInMins = toTaipeiMins(r.clock_in);
+    const clockInMins = toTaipeiMinutes(r.clock_in);
     const lateOffset = clockInMins - startMins;
     const late_mins = lateOffset > 0 ? lateOffset : null;
 
     let early_leave_mins: number | null = null;
     if (r.clock_out) {
-      const diff = endMins - toTaipeiMins(r.clock_out);
+      const diff = endMins - toTaipeiMinutes(r.clock_out);
       early_leave_mins = diff > 0 ? diff : null;
     }
 

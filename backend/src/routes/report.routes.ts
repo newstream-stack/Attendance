@@ -5,6 +5,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { db } from '../config/database';
 import { getSettings } from '../repositories/systemSettings.repository';
+import { deductLunchBreak } from '../utils/workingDays';
 
 const router = Router();
 router.use(authMiddleware, requireRole('admin', 'manager'));
@@ -120,11 +121,11 @@ router.get(
           const diff = endMins - toTaipeiMins(r.clock_out);
           if (diff > 0) early_leave_mins = diff;
         }
-        // Recompute duration from actual timestamps to fix any stale stored values
+        // Recompute duration from actual timestamps (deducting lunch break)
         let duration_mins = r.duration_mins;
         if (r.clock_in && r.clock_out) {
-          const diffMs = new Date(r.clock_out).getTime() - new Date(r.clock_in).getTime();
-          if (diffMs > 0) duration_mins = Math.round(diffMs / 60000);
+          const computed = deductLunchBreak(toTaipeiMins(r.clock_in), toTaipeiMins(r.clock_out));
+          if (computed > 0) duration_mins = computed;
         }
         return { ...r, duration_mins, late_mins, early_leave_mins };
       });
