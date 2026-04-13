@@ -51,9 +51,16 @@ export async function listRecords(
 export async function upsertClockIn(userId: string, workDate: string, clockInTime: string): Promise<AttendanceRecord> {
   const existing = await findTodayRecord(userId, workDate);
   if (existing) {
+    const updates: Record<string, unknown> = { clock_in: clockInTime as any, updated_at: db.fn.now() };
+    // Recalculate duration if clock_out already exists
+    if (existing.clock_out) {
+      const diffMs = new Date(existing.clock_out as unknown as string).getTime() - new Date(clockInTime).getTime();
+      updates.duration_mins = diffMs > 0 ? Math.round(diffMs / 60000) : null;
+      updates.status = 'completed';
+    }
     const [record] = await db<AttendanceRecord>('attendance_records')
       .where({ id: existing.id })
-      .update({ clock_in: clockInTime as any, updated_at: db.fn.now() })
+      .update(updates)
       .returning('*');
     return record;
   }
