@@ -54,8 +54,9 @@ function today() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: '待審核', approved: '已核准', rejected: '已退回', cancelled: '已取消',
+function currentYearMonth() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 export default function AdminReportsPage() {
@@ -75,6 +76,9 @@ export default function AdminReportsPage() {
   const [leaveUserId, setLeaveUserId] = useState('all')
   const [leaveTypeId, setLeaveTypeId] = useState('all')
   const [leaveQuery, setLeaveQuery] = useState({ start: today(), end: today(), user_id: '', leave_type_id: '' })
+
+  // ── 月報 ──
+  const [monthlyMonth, setMonthlyMonth] = useState(currentYearMonth)
 
   const [tab, setTab] = useState<'attendance' | 'leave'>('attendance')
 
@@ -106,28 +110,45 @@ export default function AdminReportsPage() {
   const downloadCSV = async () => {
     try {
       let url: string
+      let filename: string
       if (tab === 'attendance') {
         const p = new URLSearchParams({ start: attQuery.start, end: attQuery.end, format: 'csv' })
         if (attQuery.user_id) p.set('user_id', attQuery.user_id)
         url = `/reports/attendance?${p}`
+        filename = `attendance_${attQuery.start}_${attQuery.end}.csv`
       } else {
         const p = new URLSearchParams({ start: leaveQuery.start, end: leaveQuery.end, format: 'csv' })
         if (leaveQuery.user_id) p.set('user_id', leaveQuery.user_id)
         if (leaveQuery.leave_type_id) p.set('leave_type_id', leaveQuery.leave_type_id)
         url = `/reports/leave-summary?${p}`
+        filename = `leave_${leaveQuery.start}_${leaveQuery.end}.csv`
       }
       const response = await apiClient.get(url, { responseType: 'blob' })
-      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(blob)
-      link.download = tab === 'attendance'
-        ? `attendance_${attQuery.start}_${attQuery.end}.csv`
-        : `leave_${leaveQuery.start}_${leaveQuery.end}.csv`
-      link.click()
-      URL.revokeObjectURL(link.href)
+      triggerDownload(response.data, filename)
     } catch {
       toast({ variant: 'destructive', title: '匯出失敗' })
     }
+  }
+
+  const downloadMonthlyCSV = async () => {
+    if (!monthlyMonth) return
+    const [year, month] = monthlyMonth.split('-')
+    try {
+      const p = new URLSearchParams({ year, month: String(parseInt(month)) })
+      const response = await apiClient.get(`/reports/monthly-summary?${p}`, { responseType: 'blob' })
+      triggerDownload(response.data, `monthly_${year}_${month}.csv`)
+    } catch {
+      toast({ variant: 'destructive', title: '月報下載失敗' })
+    }
+  }
+
+  function triggerDownload(data: Blob, filename: string) {
+    const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
   }
 
   // ── 欄位定義 ──
@@ -175,9 +196,23 @@ export default function AdminReportsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-semibold">報表</h1>
-        <Button variant="outline" onClick={downloadCSV}>
-          <Download className="h-4 w-4 mr-1" />匯出 CSV
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 月報下載 */}
+          <div className="flex items-center gap-1">
+            <Input
+              type="month"
+              className="w-36 h-9"
+              value={monthlyMonth}
+              onChange={(e) => setMonthlyMonth(e.target.value)}
+            />
+            <Button variant="outline" onClick={downloadMonthlyCSV}>
+              <Download className="h-4 w-4 mr-1" />月報
+            </Button>
+          </div>
+          <Button variant="outline" onClick={downloadCSV}>
+            <Download className="h-4 w-4 mr-1" />匯出 CSV
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
