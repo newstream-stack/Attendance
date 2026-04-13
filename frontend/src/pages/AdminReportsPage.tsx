@@ -145,13 +145,13 @@ export default function AdminReportsPage() {
     {
       key: 'is_late', header: '遲到/早退',
       render: (r) => {
-        const late = r.late_mins != null ? fmtMins(r.late_mins) : null
-        const early = r.early_leave_mins != null ? fmtMins(r.early_leave_mins) : null
+        const late = r.late_mins != null && r.late_mins > 0 ? fmtMins(r.late_mins) : null
+        const early = r.early_leave_mins != null && r.early_leave_mins > 0 ? fmtMins(r.early_leave_mins) : null
         if (!late && !early) return <span className="text-slate-400">—</span>
         return (
           <div className="flex flex-col gap-0.5">
-            {late && <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">遲到 {late}</span>}
-            {early && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">早退 {early}</span>}
+            {late && <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 whitespace-nowrap">遲到 {late}</span>}
+            {early && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 whitespace-nowrap">早退 {early}</span>}
           </div>
         )
       },

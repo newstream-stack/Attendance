@@ -59,16 +59,18 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
   const [eh, em] = settings.work_end_time.split(':').map(Number);
   const endMins = eh * 60 + em;
 
+  const toTaipeiMins = (ts: Date | string) => {
+    const d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    return d.getHours() * 60 + d.getMinutes();
+  };
+
   return records.map((r) => {
-    const clockInDate = new Date(r.clock_in);
-    const clockInMins = clockInDate.getHours() * 60 + clockInDate.getMinutes();
+    const clockInMins = toTaipeiMins(r.clock_in);
     const late_mins = r.is_late ? Math.max(0, clockInMins - startMins) : null;
 
     let early_leave_mins: number | null = null;
     if (r.clock_out) {
-      const clockOutDate = new Date(r.clock_out);
-      const clockOutMins = clockOutDate.getHours() * 60 + clockOutDate.getMinutes();
-      const diff = endMins - clockOutMins;
+      const diff = endMins - toTaipeiMins(r.clock_out);
       early_leave_mins = diff > 0 ? diff : null;
     }
 

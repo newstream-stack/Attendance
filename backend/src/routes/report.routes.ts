@@ -45,18 +45,19 @@ router.get(
       const [eh, em] = settings.work_end_time.split(':').map(Number);
       const endMins = eh * 60 + em;
 
+      const toTaipeiMins = (ts: string) => {
+        const d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+        return d.getHours() * 60 + d.getMinutes();
+      };
+
       const enriched = rows.map((r: Record<string, unknown>) => {
         let late_mins: number | null = null;
         if (r.is_late && r.clock_in) {
-          const d = new Date(r.clock_in as string);
-          const mins = d.getHours() * 60 + d.getMinutes();
-          late_mins = Math.max(0, mins - startMins);
+          late_mins = Math.max(0, toTaipeiMins(r.clock_in as string) - startMins);
         }
         let early_leave_mins: number | null = null;
         if (r.clock_out) {
-          const d = new Date(r.clock_out as string);
-          const mins = d.getHours() * 60 + d.getMinutes();
-          const diff = endMins - mins;
+          const diff = endMins - toTaipeiMins(r.clock_out as string);
           if (diff > 0) early_leave_mins = diff;
         }
         return { ...r, late_mins, early_leave_mins };
@@ -68,8 +69,8 @@ router.get(
           r.full_name,
           r.department ?? '',
           r.work_date,
-          r.clock_in ? new Date(r.clock_in as string).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
-          r.clock_out ? new Date(r.clock_out as string).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+          r.clock_in ? new Date(r.clock_in as string).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Taipei' }) : '',
+          r.clock_out ? new Date(r.clock_out as string).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Taipei' }) : '',
           r.duration_mins ?? '',
           r.status,
           r.is_late ? '是' : '否',

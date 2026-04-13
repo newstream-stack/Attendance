@@ -60,18 +60,18 @@ export default function AttendanceHistoryPage() {
     {
       key: 'is_late', header: '遲到/早退',
       render: (r) => {
-        const late = r.late_mins != null ? formatOffMins(r.late_mins) : null
-        const early = r.early_leave_mins != null ? formatOffMins(r.early_leave_mins) : null
+        const late = r.late_mins != null && r.late_mins > 0 ? formatOffMins(r.late_mins) : null
+        const early = r.early_leave_mins != null && r.early_leave_mins > 0 ? formatOffMins(r.early_leave_mins) : null
         if (!late && !early) return <span className="text-slate-400">—</span>
         return (
           <div className="flex flex-col gap-0.5">
             {late && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 whitespace-nowrap">
                 遲到 {late}
               </span>
             )}
             {early && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 whitespace-nowrap">
                 早退 {early}
               </span>
             )}

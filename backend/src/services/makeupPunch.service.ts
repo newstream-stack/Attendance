@@ -23,32 +23,39 @@ export async function updateRules(data: { deadline_working_days?: number; reason
 
 /** Returns the deadline Date (end of the Nth working day after workDate) */
 async function calcDeadline(workDate: string, deadlineDays: number): Promise<Date> {
-  const start = new Date(workDate + 'T00:00:00');
-  start.setDate(start.getDate() + 1); // start from next day
+  // Work with Taiwan-timezone date strings to avoid UTC offset issues
+  const toTaipeiDate = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+  const addDay = (dateStr: string) => {
+    const d = new Date(`${dateStr}T00:00:00+08:00`);
+    d.setDate(d.getDate() + 1);
+    return toTaipeiDate(d);
+  };
+  const dayOfWeekTaipei = (dateStr: string) => new Date(`${dateStr}T12:00:00+08:00`).getDay();
 
-  // Fetch holidays for a reasonable window (workDate year + next year)
+  let curDateStr = addDay(workDate); // start from next day
+
   const year = new Date(workDate).getFullYear();
   const holidays = await db('public_holidays')
     .whereBetween('year', [year, year + 1])
     .select('holiday_date')
     .then((rows: { holiday_date: string | Date }[]) =>
-      new Set(rows.map((r) => new Date(r.holiday_date).toLocaleDateString('en-CA')))
+      new Set(rows.map((r) => new Date(r.holiday_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })))
     );
 
   let count = 0;
-  const cur = new Date(start);
   while (count < deadlineDays) {
-    const dayOfWeek = cur.getDay();
-    const dateStr = cur.toLocaleDateString('en-CA');
-    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidays.has(dateStr)) {
+    const dow = dayOfWeekTaipei(curDateStr);
+    if (dow !== 0 && dow !== 6 && !holidays.has(curDateStr)) {
       count++;
     }
-    if (count < deadlineDays) cur.setDate(cur.getDate() + 1);
+    if (count < deadlineDays) curDateStr = addDay(curDateStr);
   }
 
-  // Deadline is end of that working day (23:59:59)
-  cur.setHours(23, 59, 59, 999);
-  return cur;
+  const cur = new Date(curDateStr + 'T00:00:00+08:00'); // keep cur for the return below
+
+  // Deadline is end of that working day in Taiwan time (23:59:59 +08:00)
+  const deadlineDateStr = cur.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+  return new Date(`${deadlineDateStr}T23:59:59+08:00`);
 }
 
 // ─── Requests ─────────────────────────────────────────────────────────────────
