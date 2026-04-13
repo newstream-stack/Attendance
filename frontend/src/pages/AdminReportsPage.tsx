@@ -36,6 +36,30 @@ interface LeaveRow {
   reason: string | null
 }
 
+interface MonthlyLeave {
+  leave_type_id: string
+  leave_type: string
+  count: number
+  mins: number
+}
+
+interface MonthlyRow {
+  employee_id: string
+  full_name: string
+  department: string | null
+  attend_days: number
+  late_count: number
+  late_mins: number
+  early_count: number
+  early_mins: number
+  leaves: MonthlyLeave[]
+}
+
+interface MonthlySummary {
+  leave_types: { id: string; name_zh: string }[]
+  rows: MonthlyRow[]
+}
+
 function fmtTime(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -44,7 +68,7 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
 }
 function fmtMins(mins: number | null) {
-  if (mins == null) return '—'
+  if (mins == null || mins === 0) return '—'
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
@@ -64,6 +88,8 @@ export default function AdminReportsPage() {
   const { data: leaveTypes = [] } = useLeaveTypes()
   const { data: colleagues = [] } = useColleagues()
 
+  const [tab, setTab] = useState<'attendance' | 'leave' | 'monthly'>('attendance')
+
   // ── 出勤篩選 ──
   const [attStart, setAttStart] = useState(today)
   const [attEnd, setAttEnd] = useState(today)
@@ -79,8 +105,7 @@ export default function AdminReportsPage() {
 
   // ── 月報 ──
   const [monthlyMonth, setMonthlyMonth] = useState(currentYearMonth)
-
-  const [tab, setTab] = useState<'attendance' | 'leave'>('attendance')
+  const [monthlyQuery, setMonthlyQuery] = useState(currentYearMonth())
 
   // ── Queries ──
   const { data: attendanceData = [] } = useQuery({
@@ -106,7 +131,28 @@ export default function AdminReportsPage() {
     enabled: tab === 'leave',
   })
 
-  // ── CSV 下載 ──
+  const { data: monthlyData } = useQuery({
+    queryKey: ['report', 'monthly', monthlyQuery],
+    queryFn: async () => {
+      const [year, month] = monthlyQuery.split('-')
+      const { data } = await apiClient.get<MonthlySummary>('/reports/monthly-summary', {
+        params: { year, month: String(parseInt(month)) },
+      })
+      return data
+    },
+    enabled: tab === 'monthly',
+  })
+
+  // ── 下載工具 ──
+  function triggerDownload(data: Blob, filename: string) {
+    const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
   const downloadCSV = async () => {
     try {
       let url: string
@@ -116,12 +162,15 @@ export default function AdminReportsPage() {
         if (attQuery.user_id) p.set('user_id', attQuery.user_id)
         url = `/reports/attendance?${p}`
         filename = `attendance_${attQuery.start}_${attQuery.end}.csv`
-      } else {
+      } else if (tab === 'leave') {
         const p = new URLSearchParams({ start: leaveQuery.start, end: leaveQuery.end, format: 'csv' })
         if (leaveQuery.user_id) p.set('user_id', leaveQuery.user_id)
         if (leaveQuery.leave_type_id) p.set('leave_type_id', leaveQuery.leave_type_id)
         url = `/reports/leave-summary?${p}`
         filename = `leave_${leaveQuery.start}_${leaveQuery.end}.csv`
+      } else {
+        await downloadMonthlyCSV()
+        return
       }
       const response = await apiClient.get(url, { responseType: 'blob' })
       triggerDownload(response.data, filename)
@@ -131,24 +180,14 @@ export default function AdminReportsPage() {
   }
 
   const downloadMonthlyCSV = async () => {
-    if (!monthlyMonth) return
-    const [year, month] = monthlyMonth.split('-')
+    const [year, month] = monthlyQuery.split('-')
     try {
-      const p = new URLSearchParams({ year, month: String(parseInt(month)) })
+      const p = new URLSearchParams({ year, month: String(parseInt(month)), format: 'csv' })
       const response = await apiClient.get(`/reports/monthly-summary?${p}`, { responseType: 'blob' })
       triggerDownload(response.data, `monthly_${year}_${month}.csv`)
     } catch {
       toast({ variant: 'destructive', title: '月報下載失敗' })
     }
-  }
-
-  function triggerDownload(data: Blob, filename: string) {
-    const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(link.href)
   }
 
   // ── 欄位定義 ──
@@ -186,51 +225,37 @@ export default function AdminReportsPage() {
     { key: 'start_time', header: '開始', render: (r) => fmtDate(r.start_time) },
     { key: 'end_time', header: '結束', render: (r) => fmtDate(r.end_time) },
     { key: 'duration_mins', header: '時數', render: (r) => fmtMins(r.duration_mins) },
-    {
-      key: 'status', header: '狀態',
-      render: (r) => <StatusBadge status={r.status as never} />,
-    },
+    { key: 'status', header: '狀態', render: (r) => <StatusBadge status={r.status as never} /> },
   ]
+
+  const monthlyLeaveTypes = monthlyData?.leave_types ?? []
+  const monthlyRows = monthlyData?.rows ?? []
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-semibold">報表</h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* 月報下載 */}
-          <div className="flex items-center gap-1">
-            <Input
-              type="month"
-              className="w-36 h-9"
-              value={monthlyMonth}
-              onChange={(e) => setMonthlyMonth(e.target.value)}
-            />
-            <Button variant="outline" onClick={downloadMonthlyCSV}>
-              <Download className="h-4 w-4 mr-1" />月報
-            </Button>
-          </div>
-          <Button variant="outline" onClick={downloadCSV}>
-            <Download className="h-4 w-4 mr-1" />匯出 CSV
-          </Button>
-        </div>
+        <Button variant="outline" onClick={downloadCSV}>
+          <Download className="h-4 w-4 mr-1" />
+          {tab === 'monthly' ? '匯出月報 CSV' : '匯出 CSV'}
+        </Button>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b overflow-x-auto">
-        {(['attendance', 'leave'] as const).map((t) => (
+        {(['attendance', 'leave', 'monthly'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
-            {t === 'attendance' ? '出勤紀錄' : '請假紀錄'}
+            {t === 'attendance' ? '出勤紀錄' : t === 'leave' ? '請假紀錄' : '月報'}
           </button>
         ))}
       </div>
 
-      {tab === 'attendance' ? (
+      {tab === 'attendance' && (
         <>
-          {/* 出勤篩選 */}
           <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-end">
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-500 w-10 shrink-0">員工</label>
@@ -269,9 +294,10 @@ export default function AdminReportsPage() {
             pageSize={20}
           />
         </>
-      ) : (
+      )}
+
+      {tab === 'leave' && (
         <>
-          {/* 假期篩選 */}
           <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-end">
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-500 w-10 shrink-0">員工</label>
@@ -328,6 +354,101 @@ export default function AdminReportsPage() {
             emptyText="此區間無請假紀錄"
             pageSize={20}
           />
+        </>
+      )}
+
+      {tab === 'monthly' && (
+        <>
+          {/* 月份選擇 */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-500 shrink-0">月份</label>
+            <Input
+              type="month"
+              className="w-36"
+              value={monthlyMonth}
+              onChange={(e) => setMonthlyMonth(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              onClick={() => setMonthlyQuery(monthlyMonth)}
+            >
+              查詢
+            </Button>
+          </div>
+
+          {/* 月報表格 */}
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b">
+                  <th className="text-left px-3 py-2 whitespace-nowrap font-medium text-slate-600">員工編號</th>
+                  <th className="text-left px-3 py-2 whitespace-nowrap font-medium text-slate-600">姓名</th>
+                  <th className="text-left px-3 py-2 whitespace-nowrap font-medium text-slate-600">部門</th>
+                  <th className="text-right px-3 py-2 whitespace-nowrap font-medium text-slate-600">出勤天數</th>
+                  <th className="text-right px-3 py-2 whitespace-nowrap font-medium text-slate-600">遲到次數</th>
+                  <th className="text-right px-3 py-2 whitespace-nowrap font-medium text-slate-600">遲到(分鐘)</th>
+                  <th className="text-right px-3 py-2 whitespace-nowrap font-medium text-slate-600">早退次數</th>
+                  <th className="text-right px-3 py-2 whitespace-nowrap font-medium text-slate-600">早退(分鐘)</th>
+                  {monthlyLeaveTypes.map((lt) => (
+                    <th key={lt.id} colSpan={2} className="text-center px-3 py-2 whitespace-nowrap font-medium text-slate-600 border-l">
+                      {lt.name_zh}
+                    </th>
+                  ))}
+                </tr>
+                {monthlyLeaveTypes.length > 0 && (
+                  <tr className="bg-slate-50 border-b text-xs text-slate-500">
+                    <th colSpan={8} />
+                    {monthlyLeaveTypes.map((lt) => (
+                      <>
+                        <th key={`${lt.id}-count`} className="text-right px-3 py-1 border-l">次數</th>
+                        <th key={`${lt.id}-mins`} className="text-right px-3 py-1">分鐘</th>
+                      </>
+                    ))}
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {monthlyRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8 + monthlyLeaveTypes.length * 2} className="text-center py-8 text-slate-400">
+                      此月份無資料
+                    </td>
+                  </tr>
+                ) : (
+                  monthlyRows.map((row) => (
+                    <tr key={row.employee_id} className="border-b hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-2 text-slate-500">{row.employee_id}</td>
+                      <td className="px-3 py-2 font-medium">{row.full_name}</td>
+                      <td className="px-3 py-2 text-slate-500">{row.department ?? '—'}</td>
+                      <td className="px-3 py-2 text-right">{row.attend_days}</td>
+                      <td className="px-3 py-2 text-right">
+                        {row.late_count > 0 ? <span className="text-red-600">{row.late_count}</span> : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {row.late_mins > 0 ? <span className="text-red-600">{row.late_mins}</span> : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {row.early_count > 0 ? <span className="text-amber-600">{row.early_count}</span> : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {row.early_mins > 0 ? <span className="text-amber-600">{row.early_mins}</span> : '—'}
+                      </td>
+                      {row.leaves.map((l) => (
+                        <>
+                          <td key={`${row.employee_id}-${l.leave_type_id}-count`} className="px-3 py-2 text-right border-l">
+                            {l.count > 0 ? l.count : '—'}
+                          </td>
+                          <td key={`${row.employee_id}-${l.leave_type_id}-mins`} className="px-3 py-2 text-right">
+                            {l.mins > 0 ? l.mins : '—'}
+                          </td>
+                        </>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>

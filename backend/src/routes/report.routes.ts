@@ -259,6 +259,7 @@ router.get(
     query: z.object({
       year: z.string().regex(/^\d{4}$/),
       month: z.string().regex(/^\d{1,2}$/),
+      format: z.string().optional(),
     }),
   }),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -346,20 +347,38 @@ router.get(
         emp.leaves[r.leave_type_id].mins += r.duration_mins ?? 0;
       }
 
-      const leaveHeaders = (leaveTypes as { id: string; name_zh: string }[]).flatMap(lt => [`${lt.name_zh}(次)`, `${lt.name_zh}(分鐘)`]);
-      const headers = ['員工編號', '姓名', '部門', '出勤天數', '遲到次數', '遲到(分鐘)', '早退次數', '早退(分鐘)', ...leaveHeaders];
+      const typedLeaveTypes = leaveTypes as { id: string; name_zh: string }[];
 
-      const csvRows = [...empMap.values()].map(emp => {
-        const leaveCols = (leaveTypes as { id: string; name_zh: string }[]).flatMap(lt => {
-          const l = emp.leaves[lt.id];
-          return [l?.count ?? 0, l?.mins ?? 0];
+      const result = [...empMap.values()].map(emp => ({
+        employee_id: emp.employee_id,
+        full_name: emp.full_name,
+        department: emp.department,
+        attend_days: emp.attend_days,
+        late_count: emp.late_count,
+        late_mins: emp.late_mins,
+        early_count: emp.early_count,
+        early_mins: emp.early_mins,
+        leaves: typedLeaveTypes.map(lt => ({
+          leave_type_id: lt.id,
+          leave_type: lt.name_zh,
+          count: emp.leaves[lt.id]?.count ?? 0,
+          mins: emp.leaves[lt.id]?.mins ?? 0,
+        })),
+      }));
+
+      if (req.query.format === 'csv') {
+        const leaveHeaders = typedLeaveTypes.flatMap(lt => [`${lt.name_zh}(次)`, `${lt.name_zh}(分鐘)`]);
+        const headers = ['員工編號', '姓名', '部門', '出勤天數', '遲到次數', '遲到(分鐘)', '早退次數', '早退(分鐘)', ...leaveHeaders];
+        const csvRows = result.map(emp => {
+          const leaveCols = emp.leaves.flatMap(l => [l.count, l.mins]);
+          return [emp.employee_id, emp.full_name, emp.department ?? '', emp.attend_days, emp.late_count, emp.late_mins, emp.early_count, emp.early_mins, ...leaveCols];
         });
-        return [emp.employee_id, emp.full_name, emp.department ?? '', emp.attend_days, emp.late_count, emp.late_mins, emp.early_count, emp.early_mins, ...leaveCols];
-      });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="monthly_${year}_${String(m).padStart(2, '0')}.csv"`);
+        return res.send('\uFEFF' + toCSV(headers, csvRows));
+      }
 
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="monthly_${year}_${String(m).padStart(2, '0')}.csv"`);
-      return res.send('\uFEFF' + toCSV(headers, csvRows));
+      res.json({ leave_types: typedLeaveTypes, rows: result });
     } catch (e) { next(e); }
   },
 );
