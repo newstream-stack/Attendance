@@ -1,5 +1,5 @@
 import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } from '../repositories/leaveType.repository';
-import { getBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance } from '../repositories/leaveBalance.repository';
+import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
@@ -32,6 +32,15 @@ export async function editLeaveType(id: string, data: Partial<Omit<LeaveType, 'i
 
 export async function getMyBalances(userId: string, year: number) {
   const balances = await getBalances(userId, year);
+  const types = await listLeaveTypes(false);
+  return balances.map((b) => ({
+    ...b,
+    leave_type: types.find((t) => t.id === b.leave_type_id),
+  }));
+}
+
+export async function getMyAllBalances(userId: string) {
+  const balances = await getAllBalances(userId);
   const types = await listLeaveTypes(false);
   return balances.map((b) => ({
     ...b,

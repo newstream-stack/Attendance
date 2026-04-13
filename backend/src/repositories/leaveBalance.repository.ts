@@ -5,6 +5,10 @@ export async function getBalances(userId: string, year: number): Promise<LeaveBa
   return db<LeaveBalance>('leave_balances').where({ user_id: userId, year });
 }
 
+export async function getAllBalances(userId: string): Promise<LeaveBalance[]> {
+  return db<LeaveBalance>('leave_balances').where({ user_id: userId });
+}
+
 export async function getBalance(userId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | undefined> {
   return db<LeaveBalance>('leave_balances').where({ user_id: userId, leave_type_id: leaveTypeId, year }).first();
 }

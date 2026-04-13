@@ -84,11 +84,11 @@ export function useUpdateLeaveType() {
 // ─── Leave Balances ───────────────────────────────────────────────────────────
 
 export function useLeaveBalances(year?: number) {
-  const y = year ?? new Date().getFullYear()
   return useQuery({
-    queryKey: ['leave-balances', y],
+    queryKey: ['leave-balances', year ?? 'all'],
     queryFn: async () => {
-      const { data } = await apiClient.get<LeaveBalance[]>('/leave/balances', { params: { year: y } })
+      const params = year !== undefined ? { year } : {}
+      const { data } = await apiClient.get<LeaveBalance[]>('/leave/balances', { params })
       return data
     },
   })

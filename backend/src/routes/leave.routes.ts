@@ -5,7 +5,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import {
   getLeaveTypes, createNewLeaveType, editLeaveType,
-  getMyBalances, allocateAnnualAll, adjustLeaveBalance,
+  getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance,
   previewAnnualLeave, getAllAnnualBalances,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
   approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest,
@@ -64,8 +64,13 @@ router.put(
 
 router.get('/balances', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const year = parseInt(req.query.year as string) || new Date().getFullYear();
-    res.json(await getMyBalances(req.user!.id, year));
+    const yearParam = req.query.year as string | undefined;
+    if (yearParam) {
+      const year = parseInt(yearParam) || new Date().getFullYear();
+      res.json(await getMyBalances(req.user!.id, year));
+    } else {
+      res.json(await getMyAllBalances(req.user!.id));
+    }
   } catch (e) { next(e); }
 });
 
