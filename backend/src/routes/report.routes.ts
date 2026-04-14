@@ -93,7 +93,7 @@ router.get(
         .where('u.role', '!=', 'admin')
         .select(
           'u.id as user_id', 'u.employee_id', 'u.full_name', 'u.department',
-          'u.track_attendance',
+          'u.track_attendance', 'u.is_special_dispatch',
           'a.work_date', 'a.clock_in', 'a.clock_out',
           'a.duration_mins', 'a.status', 'a.is_late',
         )
@@ -112,9 +112,13 @@ router.get(
 
       // 補休早上：載入所有查詢期間的補休日期與週排程
       const allUserIds = [...new Set((rows as { user_id: string }[]).map(r => r.user_id))];
-      const [compMorningDateRows, compMorningScheduleRows] = await Promise.all([
+      const dispatchUserIds = [...new Set((rows as { user_id: string; is_special_dispatch: boolean }[])
+        .filter(r => r.is_special_dispatch).map(r => r.user_id))];
+      const [compMorningDateRows, compMorningScheduleRows, dispatchDateRows, dispatchScheduleRows] = await Promise.all([
         listCompMorningDatesByUsers(allUserIds, start, end),
         listCompMorningSchedulesByUsers(allUserIds),
+        dispatchUserIds.length > 0 ? listDispatchDatesByUsers(dispatchUserIds, start, end) : Promise.resolve([]),
+        dispatchUserIds.length > 0 ? listSchedulesByUsers(dispatchUserIds) : Promise.resolve([]),
       ]);
       // Set of `${user_id}_YYYY-MM-DD` for specific dates
       const compMorningDateSet = new Set(
@@ -135,9 +139,41 @@ router.get(
       // 補休早上的上午工時補充（work_start 到 13:30，扣午休）
       const compMorningOffset = deductLunchBreak(workStartMins, COMP_MORNING_START);
 
+      // 特約排程：dispatchDateMap: `${user_id}_YYYY-MM-DD` → clock_in_time | null
+      const dispatchDateMap = new Map<string, string | null>();
+      for (const d of dispatchDateRows) {
+        dispatchDateMap.set(`${d.user_id}_${String(d.work_date).substring(0, 10)}`, d.clock_in_time);
+      }
+      // dispatchScheduleMap: user_id → Map<dow, clock_in_time>
+      const dispatchScheduleMap = new Map<string, Map<number, string>>();
+      for (const s of dispatchScheduleRows) {
+        if (!dispatchScheduleMap.has(s.user_id)) dispatchScheduleMap.set(s.user_id, new Map());
+        s.days_of_week.split(',').map(Number).forEach((d: number) => {
+          dispatchScheduleMap.get(s.user_id)!.set(d, s.clock_in_time);
+        });
+      }
+      // 取得特約員工某日的有效上班開始分鐘數；null 表示非預期出勤日（不計遲到）
+      const getDispatchStartMins = (userId: string, dateStr: string): number | null => {
+        const key = `${userId}_${dateStr}`;
+        if (dispatchDateMap.has(key)) {
+          const t = dispatchDateMap.get(key);
+          if (t) {
+            const [dh, dm] = t.split(':').map(Number);
+            return dh * 60 + dm + settings.late_tolerance_mins;
+          }
+        }
+        const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+        const schedTime = dispatchScheduleMap.get(userId)?.get(dow);
+        if (schedTime) {
+          const [dh, dm] = schedTime.split(':').map(Number);
+          return dh * 60 + dm + settings.late_tolerance_mins;
+        }
+        return null; // 非預期出勤日
+      };
+
       type AttRow = {
         user_id: string; employee_id: string; full_name: string; department: string | null;
-        track_attendance: boolean;
+        track_attendance: boolean; is_special_dispatch: boolean;
         work_date: string; clock_in: string | null; clock_out: string | null;
         duration_mins: number | null; status: string; is_late: boolean;
         is_comp_morning: boolean;
@@ -151,9 +187,18 @@ router.get(
         let early_leave_mins: number | null = null;
         if (r.track_attendance !== false) {
           if (r.clock_in) {
-            const effectiveStart = comp ? COMP_MORNING_START + settings.late_tolerance_mins : startMins;
-            const diff = toTaipeiMins(r.clock_in) - effectiveStart;
-            if (diff > 0) late_mins = diff;
+            let effectiveStart: number | null;
+            if (comp) {
+              effectiveStart = COMP_MORNING_START + settings.late_tolerance_mins;
+            } else if (r.is_special_dispatch) {
+              effectiveStart = getDispatchStartMins(r.user_id, dateStr);
+            } else {
+              effectiveStart = startMins;
+            }
+            if (effectiveStart !== null) {
+              const diff = toTaipeiMins(r.clock_in) - effectiveStart;
+              if (diff > 0) late_mins = diff;
+            }
           }
           if (r.clock_out && !comp) {
             const diff = endMins - toTaipeiMins(r.clock_out);
