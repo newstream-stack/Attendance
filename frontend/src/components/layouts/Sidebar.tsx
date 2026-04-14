@@ -36,6 +36,7 @@ const navItems: NavItem[] = [
   { label: '補打卡審核', to: '/admin/makeup-punch/review', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['admin', 'manager'] },
   { label: '補打卡規則', to: '/admin/makeup-punch/rules', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
   { label: '公假管理', to: '/admin/public-holidays', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin'] },
+  { label: '補休早上管理', to: '/admin/comp-morning-dates', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin'] },
   { label: '系統設定', to: '/admin/system-settings', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
   { label: '報表', to: '/admin/reports', icon: <BarChart3 className="h-5 w-5" />, roles: ['admin', 'manager'] },
 ]

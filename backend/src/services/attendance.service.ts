@@ -6,8 +6,11 @@ import { getSettings } from '../repositories/systemSettings.repository';
 import { findUserById } from '../repositories/user.repository';
 import { findDispatchDateByDate } from '../repositories/dispatchDates.repository';
 import { listSchedules } from '../repositories/dispatchSchedules.repository';
+import { findCompMorningDateByDate, listCompMorningDatesByRange } from '../repositories/compMorningDates.repository';
 import { deductLunchBreak } from '../utils/workingDays';
 import { AppError } from '../middleware/errorHandler';
+
+const COMP_MORNING_START_MINS = 13 * 60 + 30; // 13:30
 
 function getTaipeiDateString(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }); // YYYY-MM-DD
@@ -42,7 +45,12 @@ export async function clockInService(userId: string, ipAddress: string) {
   const nowMins = taipeiNow.getHours() * 60 + taipeiNow.getMinutes();
 
   let startMins: number;
-  if (user?.is_special_dispatch) {
+
+  // 補休早上：當日指定人員下午才上班，13:30 起算
+  const compMorning = await findCompMorningDateByDate(userId, workDate);
+  if (compMorning) {
+    startMins = COMP_MORNING_START_MINS + settings.late_tolerance_mins;
+  } else if (user?.is_special_dispatch) {
     // 1. 優先查個別例外日的時間
     const dispatchDate = await findDispatchDateByDate(userId, workDate);
     if (dispatchDate?.clock_in_time) {
@@ -93,16 +101,19 @@ export async function getTodayRecord(userId: string) {
 }
 
 export async function getMyHistory(userId: string, startDate: string, endDate: string) {
-  const [records, settings, user] = await Promise.all([
+  const [records, settings, user, compMorningRows] = await Promise.all([
     listRecords(userId, startDate, endDate),
     getSettings(),
     findUserById(userId),
+    listCompMorningDatesByRange(userId, startDate, endDate),
   ]);
 
   const trackAttendance = user?.track_attendance !== false;
 
+  const compMorningSet = new Set(compMorningRows.map(r => r.work_date));
+
   const [sh, sm] = settings.work_start_time.split(':').map(Number);
-  const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+  const defaultStartMins = sh * 60 + sm + settings.late_tolerance_mins;
   const [eh, em] = settings.work_end_time.split(':').map(Number);
   const endMins = eh * 60 + em;
 
@@ -112,12 +123,18 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
 
     if (trackAttendance) {
       const clockInMins = toTaipeiMinutes(r.clock_in);
-      const lateOffset = clockInMins - startMins;
+      const effectiveStartMins = compMorningSet.has(r.work_date)
+        ? COMP_MORNING_START_MINS + settings.late_tolerance_mins
+        : defaultStartMins;
+      const lateOffset = clockInMins - effectiveStartMins;
       late_mins = lateOffset > 0 ? lateOffset : null;
 
       if (r.clock_out) {
-        const diff = endMins - toTaipeiMinutes(r.clock_out);
-        early_leave_mins = diff > 0 ? diff : null;
+        // 補休早上日期下午才上班，不計早退
+        if (!compMorningSet.has(r.work_date)) {
+          const diff = endMins - toTaipeiMinutes(r.clock_out);
+          early_leave_mins = diff > 0 ? diff : null;
+        }
       }
     }
 

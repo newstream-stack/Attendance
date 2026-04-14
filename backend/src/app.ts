@@ -19,6 +19,7 @@ import publicHolidayRouter from './routes/publicHoliday.routes';
 import outingRouter from './routes/outing.routes';
 import dispatchDatesRouter from './routes/dispatchDates.routes';
 import dispatchSchedulesRouter from './routes/dispatchSchedules.routes';
+import compMorningDatesRouter from './routes/compMorningDates.routes';
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/v1/public-holidays', publicHolidayRouter);
 app.use('/api/v1/outings', outingRouter);
 app.use('/api/v1/dispatch-dates', dispatchDatesRouter);
 app.use('/api/v1/dispatch-schedules', dispatchSchedulesRouter);
+app.use('/api/v1/comp-morning-dates', compMorningDatesRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);
