@@ -22,12 +22,24 @@ function toTaipeiMinutes(ts: Date | string): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function recomputeDuration(record: { clock_in: Date | string; clock_out: Date | string | null; duration_mins: number | null }) {
+/** 補休早上的上午工時（work_start_time 到 13:30，扣午休）*/
+function compMorningOffsetMins(workStartTime: string): number {
+  const [sh, sm] = workStartTime.split(':').map(Number);
+  return deductLunchBreak(sh * 60 + sm, COMP_MORNING_START_MINS);
+}
+
+function recomputeDuration(
+  record: { clock_in: Date | string; clock_out: Date | string | null; duration_mins: number | null },
+  isCompMorning = false,
+  workStartTime = '08:30',
+) {
   if (!record.clock_out) return record.duration_mins;
   const startMins = toTaipeiMinutes(record.clock_in);
   const endMins = toTaipeiMinutes(record.clock_out);
-  const mins = deductLunchBreak(startMins, endMins);
-  return mins > 0 ? mins : record.duration_mins;
+  const actual = deductLunchBreak(startMins, endMins);
+  const base = actual > 0 ? actual : (record.duration_mins ?? 0);
+  if (isCompMorning) return base + compMorningOffsetMins(workStartTime);
+  return base > 0 ? base : record.duration_mins;
 }
 
 export async function clockInService(userId: string, ipAddress: string) {
@@ -94,9 +106,24 @@ export async function clockOutService(userId: string) {
   if (!record) throw new AppError(404, '找不到今日打卡紀錄');
   if (record.status === 'completed') throw new AppError(409, '今日已打卡下班');
 
+  const [settings, compMorning, compMorningSchedules] = await Promise.all([
+    getSettings(),
+    findCompMorningDateByDate(userId, workDate),
+    listCompMorningSchedules(userId),
+  ]);
+
+  const taipeiNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const todayDow = taipeiNow.getDay();
+  const isCompMorning = !!(compMorning || compMorningSchedules.find(
+    s => s.days_of_week.split(',').map(Number).includes(todayDow),
+  ));
+
   const startMins = toTaipeiMinutes(record.clock_in);
   const endMins = toTaipeiMinutes(new Date());
-  const durationMins = deductLunchBreak(startMins, endMins);
+  const actual = deductLunchBreak(startMins, endMins);
+  const durationMins = isCompMorning
+    ? actual + compMorningOffsetMins(settings.work_start_time)
+    : actual;
 
   return clockOut(record.id, durationMins);
 }
@@ -105,7 +132,24 @@ export async function getTodayRecord(userId: string) {
   const workDate = getTaipeiDateString();
   const record = await findTodayRecord(userId, workDate);
   if (!record) return record;
-  return { ...record, duration_mins: recomputeDuration(record) };
+
+  const [settings, compMorning, compMorningSchedules] = await Promise.all([
+    getSettings(),
+    findCompMorningDateByDate(userId, workDate),
+    listCompMorningSchedules(userId),
+  ]);
+
+  const taipeiNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const todayDow = taipeiNow.getDay();
+  const isCompMorning = !!(compMorning || compMorningSchedules.find(
+    s => s.days_of_week.split(',').map(Number).includes(todayDow),
+  ));
+
+  return {
+    ...record,
+    is_comp_morning: isCompMorning,
+    duration_mins: recomputeDuration(record, isCompMorning, settings.work_start_time),
+  };
 }
 
 export async function getMyHistory(userId: string, startDate: string, endDate: string) {
@@ -121,7 +165,6 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
 
   const compMorningSet = new Set(compMorningRows.map(r => r.work_date));
 
-  // 判斷某日期是否在補休早上週排程中
   const isCompMorningDay = (workDate: string): boolean => {
     if (compMorningSet.has(workDate)) return true;
     const dow = new Date(workDate + 'T00:00:00').getDay();
@@ -134,28 +177,31 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
   const endMins = eh * 60 + em;
 
   return records.map((r) => {
+    const isComp = isCompMorningDay(r.work_date);
     let late_mins: number | null = null;
     let early_leave_mins: number | null = null;
 
     if (trackAttendance) {
       const clockInMins = toTaipeiMinutes(r.clock_in);
-      const isComp = isCompMorningDay(r.work_date);
       const effectiveStartMins = isComp
         ? COMP_MORNING_START_MINS + settings.late_tolerance_mins
         : defaultStartMins;
       const lateOffset = clockInMins - effectiveStartMins;
       late_mins = lateOffset > 0 ? lateOffset : null;
 
-      if (r.clock_out) {
-        // 補休早上日期下午才上班，不計早退
-        if (!isComp) {
-          const diff = endMins - toTaipeiMinutes(r.clock_out);
-          early_leave_mins = diff > 0 ? diff : null;
-        }
+      if (r.clock_out && !isComp) {
+        const diff = endMins - toTaipeiMinutes(r.clock_out);
+        early_leave_mins = diff > 0 ? diff : null;
       }
     }
 
-    return { ...r, duration_mins: recomputeDuration(r), late_mins, early_leave_mins };
+    return {
+      ...r,
+      is_comp_morning: isComp,
+      duration_mins: recomputeDuration(r, isComp, settings.work_start_time),
+      late_mins,
+      early_leave_mins,
+    };
   });
 }
 

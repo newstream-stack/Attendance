@@ -28,3 +28,8 @@ export async function addCompMorningSchedule(
 export async function deleteCompMorningSchedule(id: string): Promise<void> {
   await db('comp_morning_schedules').where({ id }).delete();
 }
+
+export async function listCompMorningSchedulesByUsers(userIds: string[]): Promise<CompMorningSchedule[]> {
+  if (userIds.length === 0) return [];
+  return db<CompMorningSchedule>('comp_morning_schedules').whereIn('user_id', userIds);
+}

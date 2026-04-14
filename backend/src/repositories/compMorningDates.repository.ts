@@ -28,6 +28,13 @@ export async function listCompMorningDatesByRange(userId: string, start: string,
     .orderBy('work_date');
 }
 
+export async function listCompMorningDatesByUsers(userIds: string[], start: string, end: string): Promise<CompMorningDate[]> {
+  if (userIds.length === 0) return [];
+  return db<CompMorningDate>('comp_morning_dates')
+    .whereIn('user_id', userIds)
+    .whereBetween('work_date', [start, end]);
+}
+
 export async function findCompMorningDateByDate(userId: string, workDate: string): Promise<CompMorningDate | undefined> {
   return db<CompMorningDate>('comp_morning_dates').where({ user_id: userId, work_date: workDate }).first();
 }

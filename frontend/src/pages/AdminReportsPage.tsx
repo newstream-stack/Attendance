@@ -21,6 +21,7 @@ interface AttendanceRow {
   duration_mins: number | null
   status: string
   is_late: boolean
+  is_comp_morning: boolean
   late_mins: number | null
   early_leave_mins: number | null
 }
@@ -207,9 +208,11 @@ export default function AdminReportsPage() {
       render: (r) => {
         const late = r.late_mins != null && r.late_mins > 0 ? fmtMins(r.late_mins) : null
         const early = r.early_leave_mins != null && r.early_leave_mins > 0 ? fmtMins(r.early_leave_mins) : null
-        if (!late && !early) return <span className="text-slate-400">—</span>
+        const comp = r.is_comp_morning
+        if (!late && !early && !comp) return <span className="text-slate-400">—</span>
         return (
           <div className="flex flex-col gap-0.5">
+            {comp && <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 whitespace-nowrap">補休早上</span>}
             {late && <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 whitespace-nowrap">遲到 {late}</span>}
             {early && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 whitespace-nowrap">早退 {early}</span>}
           </div>

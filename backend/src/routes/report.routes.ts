@@ -8,6 +8,8 @@ import { getSettings } from '../repositories/systemSettings.repository';
 import { deductLunchBreak } from '../utils/workingDays';
 import { listDispatchDatesByUsers } from '../repositories/dispatchDates.repository';
 import { listSchedulesByUsers } from '../repositories/dispatchSchedules.repository';
+import { listCompMorningDatesByUsers } from '../repositories/compMorningDates.repository';
+import { listCompMorningSchedulesByUsers } from '../repositories/compMorningSchedules.repository';
 
 const router = Router();
 router.use(authMiddleware, requireRole('admin', 'manager'));
@@ -102,38 +104,70 @@ router.get(
       const [rows, settings] = await Promise.all([q, getSettings()]);
 
       const [sh, sm] = settings.work_start_time.split(':').map(Number);
-      const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+      const workStartMins = sh * 60 + sm;
+      const startMins = workStartMins + settings.late_tolerance_mins;
       const [eh, em] = settings.work_end_time.split(':').map(Number);
       const endMins = eh * 60 + em;
+      const COMP_MORNING_START = 13 * 60 + 30; // 13:30
+
+      // 補休早上：載入所有查詢期間的補休日期與週排程
+      const allUserIds = [...new Set((rows as { user_id: string }[]).map(r => r.user_id))];
+      const [compMorningDateRows, compMorningScheduleRows] = await Promise.all([
+        listCompMorningDatesByUsers(allUserIds, start, end),
+        listCompMorningSchedulesByUsers(allUserIds),
+      ]);
+      // Set of `${user_id}_YYYY-MM-DD` for specific dates
+      const compMorningDateSet = new Set(
+        compMorningDateRows.map(r => `${r.user_id}_${String(r.work_date).substring(0, 10)}`),
+      );
+      // Map: user_id → Set<dow>
+      const compMorningSchedMap = new Map<string, Set<number>>();
+      for (const s of compMorningScheduleRows) {
+        if (!compMorningSchedMap.has(s.user_id)) compMorningSchedMap.set(s.user_id, new Set());
+        s.days_of_week.split(',').map(Number).forEach(d => compMorningSchedMap.get(s.user_id)!.add(d));
+      }
+      const isCompMorning = (userId: string, dateStr: string): boolean => {
+        const key = `${userId}_${dateStr}`;
+        if (compMorningDateSet.has(key)) return true;
+        const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+        return compMorningSchedMap.get(userId)?.has(dow) ?? false;
+      };
+      // 補休早上的上午工時補充（work_start 到 13:30，扣午休）
+      const compMorningOffset = deductLunchBreak(workStartMins, COMP_MORNING_START);
 
       type AttRow = {
         user_id: string; employee_id: string; full_name: string; department: string | null;
         track_attendance: boolean;
         work_date: string; clock_in: string | null; clock_out: string | null;
         duration_mins: number | null; status: string; is_late: boolean;
+        is_comp_morning: boolean;
         late_mins: number | null; early_leave_mins: number | null;
       };
 
-      const enriched: AttRow[] = (rows as Omit<AttRow, 'late_mins' | 'early_leave_mins'>[]).map(r => {
+      const enriched: AttRow[] = (rows as Omit<AttRow, 'late_mins' | 'early_leave_mins' | 'is_comp_morning'>[]).map(r => {
+        const dateStr = toDateStr(r.work_date);
+        const comp = isCompMorning(r.user_id, dateStr);
         let late_mins: number | null = null;
         let early_leave_mins: number | null = null;
         if (r.track_attendance !== false) {
           if (r.clock_in) {
-            const diff = toTaipeiMins(r.clock_in) - startMins;
+            const effectiveStart = comp ? COMP_MORNING_START + settings.late_tolerance_mins : startMins;
+            const diff = toTaipeiMins(r.clock_in) - effectiveStart;
             if (diff > 0) late_mins = diff;
           }
-          if (r.clock_out) {
+          if (r.clock_out && !comp) {
             const diff = endMins - toTaipeiMins(r.clock_out);
             if (diff > 0) early_leave_mins = diff;
           }
         }
-        // Recompute duration from actual timestamps (deducting lunch break)
+        // Recompute duration from actual timestamps (deducting lunch break) + comp morning offset
         let duration_mins = r.duration_mins;
         if (r.clock_in && r.clock_out) {
-          const computed = deductLunchBreak(toTaipeiMins(r.clock_in), toTaipeiMins(r.clock_out));
-          if (computed > 0) duration_mins = computed;
+          const actual = deductLunchBreak(toTaipeiMins(r.clock_in), toTaipeiMins(r.clock_out));
+          const computed = actual > 0 ? actual : (r.duration_mins ?? 0);
+          duration_mins = comp ? computed + compMorningOffset : (computed > 0 ? computed : r.duration_mins);
         }
-        return { ...r, duration_mins, late_mins, early_leave_mins };
+        return { ...r, is_comp_morning: comp, duration_mins, late_mins, early_leave_mins };
       });
 
       if (req.query.format === 'csv') {
@@ -198,7 +232,7 @@ router.get(
           leaveMap.get(lr.user_id)!.push(lr);
         }
 
-        const headers = ['員工編號', '姓名', '部門', '日期', '狀態', '上班時間', '下班時間', '工時(分鐘)', '遲到(分鐘)', '早退(分鐘)', '請假類型', '請假時數(分鐘)'];
+        const headers = ['員工編號', '姓名', '部門', '日期', '狀態', '補休早上', '上班時間', '下班時間', '工時(分鐘)', '遲到(分鐘)', '早退(分鐘)', '請假類型', '請假時數(分鐘)'];
         const csvRows: unknown[][] = [];
 
         for (const date of dates) {
@@ -217,9 +251,11 @@ router.get(
             let status: string;
             let clockIn = '', clockOut = '', durationMins: string | number = '', lateMins: string | number = '', earlyMins: string | number = '';
             let leaveType = '', leaveMins: string | number = '';
+            let compMorningLabel = '';
 
             if (att) {
               status = '出勤';
+              compMorningLabel = att.is_comp_morning ? '是' : '';
               clockIn = att.clock_in ? fmtTime(att.clock_in) : '';
               clockOut = att.clock_out ? fmtTime(att.clock_out) : '';
               durationMins = att.duration_mins ?? '';
@@ -239,7 +275,7 @@ router.get(
 
             csvRows.push([
               emp.employee_id, emp.full_name, emp.department ?? '',
-              date, status, clockIn, clockOut, durationMins, lateMins, earlyMins,
+              date, status, compMorningLabel, clockIn, clockOut, durationMins, lateMins, earlyMins,
               leaveType, leaveMins,
             ]);
           }
