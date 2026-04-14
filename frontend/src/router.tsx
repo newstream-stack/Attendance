@@ -32,8 +32,6 @@ import OutingPage from '@/pages/OutingPage'
 import AdminOutingsPage from '@/pages/AdminOutingsPage'
 import HolidayCalendarPage from '@/pages/HolidayCalendarPage'
 import ProxyReviewPage from '@/pages/ProxyReviewPage'
-import AdminCompMorningDatesPage from '@/pages/AdminCompMorningDatesPage'
-
 function PrivateRoute() {
   const { user, isLoading } = useAuthStore()
   const location = useLocation()
@@ -108,7 +106,6 @@ export const router = createBrowserRouter([
       { path: '/admin/outings', element: <AdminOutingsPage /> },
       { path: '/holidays', element: <HolidayCalendarPage /> },
       { path: '/leave/proxy-review', element: <ProxyReviewPage /> },
-      { path: '/admin/comp-morning-dates', element: <AdminCompMorningDatesPage /> },
     ],
   },
 ])

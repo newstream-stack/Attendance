@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail, CalendarDays } from 'lucide-react'
+import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail, CalendarDays, Coffee } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { useDispatchDates, useAddDispatchDate, useDeleteDispatchDate } from '@/api/dispatchDates.api'
+import { useCompMorningDates, useAddCompMorningDate, useDeleteCompMorningDate } from '@/api/compMorningDates.api'
 import {
   useDispatchSchedules, useAddDispatchSchedule, useDeleteDispatchSchedule,
   DOW_LABELS, parseDow, formatDow,
@@ -83,6 +84,7 @@ export default function AdminUsersPage() {
   const [copied, setCopied] = useState(false)
   const [sendEmailTarget, setSendEmailTarget] = useState<UserRow | null>(null)
   const [dispatchTarget, setDispatchTarget] = useState<UserRow | null>(null)
+  const [compMorningTarget, setCompMorningTarget] = useState<UserRow | null>(null)
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -217,6 +219,9 @@ export default function AdminUsersPage() {
               <CalendarDays className="h-4 w-4" />
             </Button>
           )}
+          <Button size="sm" variant="ghost" className="text-amber-600 hover:text-amber-700" onClick={() => setCompMorningTarget(row as unknown as UserRow)} title="補休早上日期">
+            <Coffee className="h-4 w-4" />
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSendEmailTarget(row)} title="傳送密碼重設信">
             <Mail className="h-4 w-4" />
           </Button>
@@ -345,6 +350,14 @@ export default function AdminUsersPage() {
         <DispatchDatesDialog
           user={dispatchTarget}
           onClose={() => setDispatchTarget(null)}
+        />
+      )}
+
+      {/* Comp morning dates management */}
+      {compMorningTarget && (
+        <CompMorningDatesDialog
+          user={compMorningTarget}
+          onClose={() => setCompMorningTarget(null)}
         />
       )}
 
@@ -505,6 +518,79 @@ function UserFormFields({
         />
       </div>
     </>
+  )
+}
+
+function CompMorningDatesDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  const { toast } = useToast()
+  const { data: dates = [], isLoading } = useCompMorningDates(user.id)
+  const addDate = useAddCompMorningDate()
+  const deleteDate = useDeleteCompMorningDate()
+  const [singleDate, setSingleDate] = useState('')
+  const [singleNote, setSingleNote] = useState('')
+
+  const handleAdd = async () => {
+    if (!singleDate) return
+    try {
+      await addDate.mutateAsync({ user_id: user.id, work_date: singleDate, note: singleNote || undefined })
+      setSingleDate(''); setSingleNote('')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast({ variant: 'destructive', title: '新增失敗', description: msg ?? '日期可能已存在' })
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>補休早上 — {user.full_name}</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-slate-500">指定日期上午不算出勤，從 13:30 開始計算</p>
+
+        {/* 新增 */}
+        <div className="space-y-2 rounded-md border p-3">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">新增日期</p>
+          <div className="flex gap-2">
+            <Input type="date" value={singleDate} onChange={e => setSingleDate(e.target.value)} className="flex-1" />
+            <Input
+              placeholder="備註（選填）"
+              value={singleNote}
+              onChange={e => setSingleNote(e.target.value)}
+              className="flex-1"
+              maxLength={200}
+            />
+            <Button onClick={handleAdd} disabled={!singleDate || addDate.isPending}>新增</Button>
+          </div>
+        </div>
+
+        {/* 清單 */}
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+            補休早上日期（共 {dates.length} 筆）
+          </p>
+          {isLoading && <p className="text-sm text-slate-400">載入中...</p>}
+          {!isLoading && dates.length === 0 && <p className="text-sm text-slate-400">尚無補休早上日期</p>}
+          {dates.map((d) => (
+            <div key={d.id} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
+              <span className="font-mono">{d.work_date.substring(0, 10)}</span>
+              <span className="text-slate-400 text-xs flex-1 ml-3">{d.note ?? ''}</span>
+              <Button
+                size="sm" variant="ghost"
+                className="text-red-500 hover:text-red-600 h-6 w-6 p-0"
+                onClick={() => deleteDate.mutate({ id: d.id, userId: user.id })}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>關閉</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
