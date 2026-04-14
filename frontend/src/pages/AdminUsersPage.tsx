@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -445,14 +445,14 @@ function UserFormFields({
         control={control}
         render={({ field }) => (
           <div className="flex items-center gap-3">
-            <Switch
+            <Checkbox
               id="track_attendance"
               checked={field.value}
               onCheckedChange={field.onChange}
             />
-            <Label htmlFor="track_attendance" className="text-sm">
+            <Label htmlFor="track_attendance" className="text-sm font-normal cursor-pointer">
               計算遲到 / 早退
-              <span className="ml-1 text-slate-400 font-normal">
+              <span className="ml-1 text-slate-400">
                 {field.value ? '（啟用）' : '（停用 — 僅記錄打卡時間）'}
               </span>
             </Label>
