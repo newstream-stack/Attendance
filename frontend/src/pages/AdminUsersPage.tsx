@@ -3,6 +3,8 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +38,7 @@ const createSchema = z.object({
   position: z.string().max(100).optional(),
   hire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '格式須為 YYYY-MM-DD'),
   manager_id: z.string().uuid().nullable().optional(),
+  track_attendance: z.boolean(),
 })
 
 const editSchema = createSchema
@@ -76,7 +79,7 @@ export default function AdminUsersPage() {
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { role: 'employee', manager_id: null },
+    defaultValues: { role: 'employee', manager_id: null, track_attendance: true },
   })
 
   const editForm = useForm<EditForm>({
@@ -106,6 +109,7 @@ export default function AdminUsersPage() {
       position: user.position ?? '',
       hire_date: user.hire_date.slice(0, 10),
       manager_id: user.manager_id,
+      track_attendance: user.track_attendance,
     })
   }
 
@@ -172,6 +176,14 @@ export default function AdminUsersPage() {
       render: (row) => <Badge variant="outline">{ROLE_LABELS[row.role]}</Badge>,
     },
     { key: 'department', header: '部門', render: (row) => row.department ?? '—' },
+    {
+      key: 'track_attendance', header: '出勤規範',
+      render: (row) => (
+        <Badge variant={(row as unknown as UserRow).track_attendance ? 'outline' : 'secondary'}>
+          {(row as unknown as UserRow).track_attendance ? '一般' : '不計遲退'}
+        </Badge>
+      ),
+    },
     {
       key: 'is_active', header: '狀態',
       render: (row) => (
@@ -428,6 +440,25 @@ function UserFormFields({
           )}
         />
       </FormField>
+      <Controller
+        name="track_attendance"
+        control={control}
+        render={({ field }) => (
+          <div className="flex items-center gap-3">
+            <Switch
+              id="track_attendance"
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+            <Label htmlFor="track_attendance" className="text-sm">
+              計算遲到 / 早退
+              <span className="ml-1 text-slate-400 font-normal">
+                {field.value ? '（啟用）' : '（停用 — 僅記錄打卡時間）'}
+              </span>
+            </Label>
+          </div>
+        )}
+      />
     </>
   )
 }

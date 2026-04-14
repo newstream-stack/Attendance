@@ -89,6 +89,7 @@ router.get(
         .where('u.role', '!=', 'admin')
         .select(
           'u.id as user_id', 'u.employee_id', 'u.full_name', 'u.department',
+          'u.track_attendance',
           'a.work_date', 'a.clock_in', 'a.clock_out',
           'a.duration_mins', 'a.status', 'a.is_late',
         )
@@ -105,6 +106,7 @@ router.get(
 
       type AttRow = {
         user_id: string; employee_id: string; full_name: string; department: string | null;
+        track_attendance: boolean;
         work_date: string; clock_in: string | null; clock_out: string | null;
         duration_mins: number | null; status: string; is_late: boolean;
         late_mins: number | null; early_leave_mins: number | null;
@@ -112,14 +114,16 @@ router.get(
 
       const enriched: AttRow[] = (rows as Omit<AttRow, 'late_mins' | 'early_leave_mins'>[]).map(r => {
         let late_mins: number | null = null;
-        if (r.clock_in) {
-          const diff = toTaipeiMins(r.clock_in) - startMins;
-          if (diff > 0) late_mins = diff;
-        }
         let early_leave_mins: number | null = null;
-        if (r.clock_out) {
-          const diff = endMins - toTaipeiMins(r.clock_out);
-          if (diff > 0) early_leave_mins = diff;
+        if (r.track_attendance !== false) {
+          if (r.clock_in) {
+            const diff = toTaipeiMins(r.clock_in) - startMins;
+            if (diff > 0) late_mins = diff;
+          }
+          if (r.clock_out) {
+            const diff = endMins - toTaipeiMins(r.clock_out);
+            if (diff > 0) early_leave_mins = diff;
+          }
         }
         // Recompute duration from actual timestamps (deducting lunch break)
         let duration_mins = r.duration_mins;
@@ -300,7 +304,7 @@ router.get(
 
       const [leaveTypes, employees, settings] = await Promise.all([
         db('leave_types').where('is_active', true).orderBy('name_zh').select('id', 'name_zh'),
-        db('users').whereNull('deleted_at').where('role', '!=', 'admin').orderBy('department').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department'),
+        db('users').whereNull('deleted_at').where('role', '!=', 'admin').orderBy('department').orderBy('full_name').select('id', 'employee_id', 'full_name', 'department', 'track_attendance'),
         getSettings(),
       ]);
 
@@ -338,6 +342,10 @@ router.get(
         leaves: Record<string, { count: number; mins: number }>;
       };
 
+      const trackMap = new Map<string, boolean>(
+        (employees as { id: string; track_attendance: boolean }[]).map(e => [e.id, e.track_attendance !== false]),
+      );
+
       const empMap = new Map<string, EmpStat>(
         (employees as { id: string; employee_id: string; full_name: string; department: string | null }[]).map(e => [e.id, {
           employee_id: e.employee_id,
@@ -356,13 +364,15 @@ router.get(
         const emp = empMap.get(r.user_id);
         if (!emp) continue;
         emp.attend_days++;
-        if (r.clock_in) {
-          const diff = toTaipeiMins(r.clock_in) - startMins;
-          if (diff > 0) { emp.late_count++; emp.late_mins += diff; }
-        }
-        if (r.clock_out) {
-          const diff = endMins - toTaipeiMins(r.clock_out);
-          if (diff > 0) { emp.early_count++; emp.early_mins += diff; }
+        if (trackMap.get(r.user_id) !== false) {
+          if (r.clock_in) {
+            const diff = toTaipeiMins(r.clock_in) - startMins;
+            if (diff > 0) { emp.late_count++; emp.late_mins += diff; }
+          }
+          if (r.clock_out) {
+            const diff = endMins - toTaipeiMins(r.clock_out);
+            if (diff > 0) { emp.early_count++; emp.early_mins += diff; }
+          }
         }
       }
 

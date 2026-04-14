@@ -53,6 +53,7 @@ const createUserSchema = z.object({
   position: z.string().max(100).optional(),
   hire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '格式須為 YYYY-MM-DD'),
   manager_id: z.string().uuid().nullable().optional(),
+  track_attendance: z.boolean().optional(),
 });
 
 // POST /api/v1/users
@@ -79,6 +80,7 @@ const updateUserSchema = z.object({
   position: z.string().max(100).nullable().optional(),
   hire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   manager_id: z.string().uuid().nullable().optional(),
+  track_attendance: z.boolean().optional(),
 });
 
 // PUT /api/v1/users/:id
