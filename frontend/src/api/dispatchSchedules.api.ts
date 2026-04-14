@@ -57,13 +57,3 @@ export function useDeleteDispatchSchedule() {
   })
 }
 
-export function useApplyDispatchSchedules() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (payload: { user_id: string; from_date: string; to_date: string }) => {
-      const { data } = await apiClient.post<{ inserted: number; total: number }>('/dispatch-schedules/apply', payload)
-      return data
-    },
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['dispatch-dates', vars.user_id] }),
-  })
-}

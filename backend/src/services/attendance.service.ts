@@ -5,6 +5,7 @@ import {
 import { getSettings } from '../repositories/systemSettings.repository';
 import { findUserById } from '../repositories/user.repository';
 import { findDispatchDateByDate } from '../repositories/dispatchDates.repository';
+import { listSchedules } from '../repositories/dispatchSchedules.repository';
 import { deductLunchBreak } from '../utils/workingDays';
 import { AppError } from '../middleware/errorHandler';
 
@@ -42,13 +43,23 @@ export async function clockInService(userId: string, ipAddress: string) {
 
   let startMins: number;
   if (user?.is_special_dispatch) {
+    // 1. 優先查個別例外日的時間
     const dispatchDate = await findDispatchDateByDate(userId, workDate);
     if (dispatchDate?.clock_in_time) {
       const [dh, dm] = dispatchDate.clock_in_time.split(':').map(Number);
       startMins = dh * 60 + dm + settings.late_tolerance_mins;
     } else {
-      // 特約人員無指定時間 → 不計遲到
-      startMins = nowMins + 1;
+      // 2. Fallback：查固定排程中今天是週幾的時間
+      const todayDow = taipeiNow.getDay();
+      const schedules = await listSchedules(userId);
+      const matched = schedules.find(s => s.days_of_week.split(',').map(Number).includes(todayDow));
+      if (matched) {
+        const [dh, dm] = matched.clock_in_time.split(':').map(Number);
+        startMins = dh * 60 + dm + settings.late_tolerance_mins;
+      } else {
+        // 非預期出勤日 → 不計遲到
+        startMins = nowMins + 1;
+      }
     }
   } else {
     const [sh, sm] = settings.work_start_time.split(':').map(Number);

@@ -16,6 +16,11 @@ export async function listSchedules(userId: string): Promise<DispatchSchedule[]>
     .orderBy('created_at');
 }
 
+export async function listSchedulesByUsers(userIds: string[]): Promise<DispatchSchedule[]> {
+  if (userIds.length === 0) return [];
+  return db<DispatchSchedule>('dispatch_schedules').whereIn('user_id', userIds);
+}
+
 export async function addSchedule(
   userId: string,
   daysOfWeek: string,

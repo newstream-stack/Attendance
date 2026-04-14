@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { useDispatchDates, useAddDispatchDate, useDeleteDispatchDate } from '@/api/dispatchDates.api'
 import {
-  useDispatchSchedules, useAddDispatchSchedule, useDeleteDispatchSchedule, useApplyDispatchSchedules,
+  useDispatchSchedules, useAddDispatchSchedule, useDeleteDispatchSchedule,
   DOW_LABELS, parseDow, formatDow,
 } from '@/api/dispatchSchedules.api'
 import { Button } from '@/components/ui/button'
@@ -531,24 +531,7 @@ function DispatchDatesDialog({ user, onClose }: { user: UserRow; onClose: () => 
     }
   }
 
-  // 套用到期間
-  const applySchedules = useApplyDispatchSchedules()
-  const [applyFrom, setApplyFrom] = useState('')
-  const [applyTo, setApplyTo] = useState('')
-
-  const handleApply = async () => {
-    if (!applyFrom || !applyTo) return
-    try {
-      const { inserted, total } = await applySchedules.mutateAsync({ user_id: user.id, from_date: applyFrom, to_date: applyTo })
-      toast({ title: `已套用，新增 ${inserted} 筆（共 ${total} 筆，重複略過）` })
-      setApplyFrom(''); setApplyTo('')
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      toast({ variant: 'destructive', title: '套用失敗', description: msg })
-    }
-  }
-
-  // 已排定出勤日
+  // 臨時出勤日
   const { data: dates = [], isLoading } = useDispatchDates(user.id)
   const addDate = useAddDispatchDate()
   const deleteDate = useDeleteDispatchDate()
@@ -621,27 +604,7 @@ function DispatchDatesDialog({ user, onClose }: { user: UserRow; onClose: () => 
           </div>
         </div>
 
-        {/* 2. 套用到期間 */}
-        <div className="space-y-2 rounded-md border p-3">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">套用到期間</p>
-          <p className="text-xs text-slate-400">依上方固定排程，自動展開指定範圍內的所有出勤日</p>
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <Label className="text-xs text-slate-500">開始日期</Label>
-              <Input type="date" value={applyFrom} onChange={e => setApplyFrom(e.target.value)} />
-            </div>
-            <div className="flex-1">
-              <Label className="text-xs text-slate-500">結束日期</Label>
-              <Input type="date" value={applyTo} onChange={e => setApplyTo(e.target.value)} />
-            </div>
-            <Button onClick={handleApply} disabled={!applyFrom || !applyTo || schedules.length === 0 || applySchedules.isPending}>
-              {applySchedules.isPending ? '套用中...' : '套用'}
-            </Button>
-          </div>
-          {schedules.length === 0 && <p className="text-xs text-amber-500">請先設定固定排程</p>}
-        </div>
-
-        {/* 3. 臨時新增 / 覆蓋 */}
+        {/* 2. 臨時新增 / 覆蓋 */}
         <div className="space-y-2 rounded-md border p-3">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">臨時新增 / 覆蓋時間</p>
           <div className="flex gap-2">
@@ -652,9 +615,9 @@ function DispatchDatesDialog({ user, onClose }: { user: UserRow; onClose: () => 
           </div>
         </div>
 
-        {/* 4. 已排定清單 */}
+        {/* 3. 臨時出勤日清單 */}
         <div className="space-y-1">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">已排定（共 {dates.length} 筆）</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">臨時出勤日（共 {dates.length} 筆）</p>
           {isLoading && <p className="text-sm text-slate-400">載入中...</p>}
           {!isLoading && dates.length === 0 && <p className="text-sm text-slate-400">尚無排定出勤日</p>}
           {dates.map((d) => (

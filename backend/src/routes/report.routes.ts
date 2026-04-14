@@ -7,6 +7,7 @@ import { db } from '../config/database';
 import { getSettings } from '../repositories/systemSettings.repository';
 import { deductLunchBreak } from '../utils/workingDays';
 import { listDispatchDatesByUsers } from '../repositories/dispatchDates.repository';
+import { listSchedulesByUsers } from '../repositories/dispatchSchedules.repository';
 
 const router = Router();
 router.use(authMiddleware, requireRole('admin', 'manager'));
@@ -145,13 +146,31 @@ router.get(
         if (user_id) empQ.where('id', user_id);
         const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null; is_special_dispatch: boolean }[];
 
-        // 取得特約人員的出勤日期
+        // 取得特約人員的固定排程與個別例外日
         const dispatchUserIds = employees.filter(e => e.is_special_dispatch).map(e => e.id);
-        const dispatchRows = dispatchUserIds.length > 0
-          ? await listDispatchDatesByUsers(dispatchUserIds, start, end)
-          : [];
-        // dispatchSet: `${user_id}_YYYY-MM-DD`
-        const dispatchSet = new Set(dispatchRows.map(r => `${r.user_id}_${r.work_date.toString().substring(0, 10)}`));
+        const [dispatchRows, scheduleRows] = dispatchUserIds.length > 0
+          ? await Promise.all([
+              listDispatchDatesByUsers(dispatchUserIds, start, end),
+              listSchedulesByUsers(dispatchUserIds),
+            ])
+          : [[], []];
+
+        // dispatchExtraSet: 個別例外日 `${user_id}_YYYY-MM-DD`
+        const dispatchExtraSet = new Set(dispatchRows.map(r => `${r.user_id}_${r.work_date.toString().substring(0, 10)}`));
+
+        // scheduleMap: user_id → Set<day_of_week>（0=日…6=六）
+        const scheduleMap = new Map<string, Set<number>>();
+        for (const s of scheduleRows) {
+          if (!scheduleMap.has(s.user_id)) scheduleMap.set(s.user_id, new Set());
+          s.days_of_week.split(',').map(Number).forEach(d => scheduleMap.get(s.user_id)!.add(d));
+        }
+
+        // 判斷某日是否為特約員工的出勤日（符合週幾排程 OR 個別例外日）
+        const isDispatchDay = (userId: string, dateStr: string): boolean => {
+          if (dispatchExtraSet.has(`${userId}_${dateStr}`)) return true;
+          const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+          return scheduleMap.get(userId)?.has(dow) ?? false;
+        };
 
         // 建立 attendance map: `${user_id}_YYYY-MM-DD` → row
         const attMap = new Map<string, AttRow>();
@@ -184,8 +203,8 @@ router.get(
 
         for (const date of dates) {
           for (const emp of employees) {
-            // 特約人員：只顯示已排定的出勤日，其他日期略過
-            if (emp.is_special_dispatch && !dispatchSet.has(`${emp.id}_${date}`)) continue;
+            // 特約人員：只顯示固定排程或例外日，其他日期略過
+            if (emp.is_special_dispatch && !isDispatchDay(emp.id, date)) continue;
 
             const att = attMap.get(`${emp.id}_${date}`);
             const empLeaves = leaveMap.get(emp.id) ?? [];
