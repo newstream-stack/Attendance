@@ -7,6 +7,7 @@ import { findUserById } from '../repositories/user.repository';
 import { findDispatchDateByDate } from '../repositories/dispatchDates.repository';
 import { listSchedules } from '../repositories/dispatchSchedules.repository';
 import { findCompMorningDateByDate, listCompMorningDatesByRange } from '../repositories/compMorningDates.repository';
+import { listCompMorningSchedules } from '../repositories/compMorningSchedules.repository';
 import { deductLunchBreak } from '../utils/workingDays';
 import { AppError } from '../middleware/errorHandler';
 
@@ -46,9 +47,16 @@ export async function clockInService(userId: string, ipAddress: string) {
 
   let startMins: number;
 
-  // 補休早上：當日指定人員下午才上班，13:30 起算
-  const compMorning = await findCompMorningDateByDate(userId, workDate);
-  if (compMorning) {
+  // 補休早上：特定日期 → 週排程 → 其他規則，13:30 起算
+  const [compMorning, compMorningSchedules] = await Promise.all([
+    findCompMorningDateByDate(userId, workDate),
+    listCompMorningSchedules(userId),
+  ]);
+  const todayDowForComp = taipeiNow.getDay();
+  const compMorningBySchedule = compMorningSchedules.find(
+    s => s.days_of_week.split(',').map(Number).includes(todayDowForComp),
+  );
+  if (compMorning || compMorningBySchedule) {
     startMins = COMP_MORNING_START_MINS + settings.late_tolerance_mins;
   } else if (user?.is_special_dispatch) {
     // 1. 優先查個別例外日的時間
@@ -101,16 +109,24 @@ export async function getTodayRecord(userId: string) {
 }
 
 export async function getMyHistory(userId: string, startDate: string, endDate: string) {
-  const [records, settings, user, compMorningRows] = await Promise.all([
+  const [records, settings, user, compMorningRows, compMorningSchedules] = await Promise.all([
     listRecords(userId, startDate, endDate),
     getSettings(),
     findUserById(userId),
     listCompMorningDatesByRange(userId, startDate, endDate),
+    listCompMorningSchedules(userId),
   ]);
 
   const trackAttendance = user?.track_attendance !== false;
 
   const compMorningSet = new Set(compMorningRows.map(r => r.work_date));
+
+  // 判斷某日期是否在補休早上週排程中
+  const isCompMorningDay = (workDate: string): boolean => {
+    if (compMorningSet.has(workDate)) return true;
+    const dow = new Date(workDate + 'T00:00:00').getDay();
+    return compMorningSchedules.some(s => s.days_of_week.split(',').map(Number).includes(dow));
+  };
 
   const [sh, sm] = settings.work_start_time.split(':').map(Number);
   const defaultStartMins = sh * 60 + sm + settings.late_tolerance_mins;
@@ -123,7 +139,8 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
 
     if (trackAttendance) {
       const clockInMins = toTaipeiMinutes(r.clock_in);
-      const effectiveStartMins = compMorningSet.has(r.work_date)
+      const isComp = isCompMorningDay(r.work_date);
+      const effectiveStartMins = isComp
         ? COMP_MORNING_START_MINS + settings.late_tolerance_mins
         : defaultStartMins;
       const lateOffset = clockInMins - effectiveStartMins;
@@ -131,7 +148,7 @@ export async function getMyHistory(userId: string, startDate: string, endDate: s
 
       if (r.clock_out) {
         // 補休早上日期下午才上班，不計早退
-        if (!compMorningSet.has(r.work_date)) {
+        if (!isComp) {
           const diff = endMins - toTaipeiMinutes(r.clock_out);
           early_leave_mins = diff > 0 ? diff : null;
         }

@@ -20,6 +20,7 @@ import outingRouter from './routes/outing.routes';
 import dispatchDatesRouter from './routes/dispatchDates.routes';
 import dispatchSchedulesRouter from './routes/dispatchSchedules.routes';
 import compMorningDatesRouter from './routes/compMorningDates.routes';
+import compMorningSchedulesRouter from './routes/compMorningSchedules.routes';
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use('/api/v1/outings', outingRouter);
 app.use('/api/v1/dispatch-dates', dispatchDatesRouter);
 app.use('/api/v1/dispatch-schedules', dispatchSchedulesRouter);
 app.use('/api/v1/comp-morning-dates', compMorningDatesRouter);
+app.use('/api/v1/comp-morning-schedules', compMorningSchedulesRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);

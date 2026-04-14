@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label'
 import { useDispatchDates, useAddDispatchDate, useDeleteDispatchDate } from '@/api/dispatchDates.api'
 import { useCompMorningDates, useAddCompMorningDate, useDeleteCompMorningDate } from '@/api/compMorningDates.api'
 import {
+  useCompMorningSchedules, useAddCompMorningSchedule, useDeleteCompMorningSchedule,
+} from '@/api/compMorningSchedules.api'
+import {
   useDispatchSchedules, useAddDispatchSchedule, useDeleteDispatchSchedule,
   DOW_LABELS, parseDow, formatDow,
 } from '@/api/dispatchSchedules.api'
@@ -523,13 +526,36 @@ function UserFormFields({
 
 function CompMorningDatesDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
   const { toast } = useToast()
+
+  // 固定星期排程
+  const { data: schedules = [] } = useCompMorningSchedules(user.id)
+  const addSchedule = useAddCompMorningSchedule()
+  const deleteSchedule = useDeleteCompMorningSchedule()
+  const [schDows, setSchDows] = useState<number[]>([])
+  const toggleDow = (d: number) =>
+    setSchDows(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
+
+  const handleAddSchedule = async () => {
+    if (schDows.length === 0) return
+    try {
+      await addSchedule.mutateAsync({
+        user_id: user.id,
+        days_of_week: [...schDows].sort().join(','),
+      })
+      setSchDows([])
+    } catch {
+      toast({ variant: 'destructive', title: '新增失敗' })
+    }
+  }
+
+  // 特定日期
   const { data: dates = [], isLoading } = useCompMorningDates(user.id)
   const addDate = useAddCompMorningDate()
   const deleteDate = useDeleteCompMorningDate()
   const [singleDate, setSingleDate] = useState('')
   const [singleNote, setSingleNote] = useState('')
 
-  const handleAdd = async () => {
+  const handleAddDate = async () => {
     if (!singleDate) return
     try {
       await addDate.mutateAsync({ user_id: user.id, work_date: singleDate, note: singleNote || undefined })
@@ -546,31 +572,78 @@ function CompMorningDatesDialog({ user, onClose }: { user: UserRow; onClose: () 
         <DialogHeader>
           <DialogTitle>補休早上 — {user.full_name}</DialogTitle>
         </DialogHeader>
-        <p className="text-xs text-slate-500">指定日期上午不算出勤，從 13:30 開始計算</p>
+        <p className="text-xs text-slate-500">指定日期或固定星期上午不算出勤，從 13:30 開始計算</p>
 
-        {/* 新增 */}
+        {/* 1. 固定星期排程 */}
         <div className="space-y-2 rounded-md border p-3">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">新增日期</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">固定星期</p>
+          {schedules.length > 0 && (
+            <div className="space-y-1 mb-2">
+              {schedules.map(s => (
+                <div key={s.id} className="flex items-center justify-between text-sm rounded bg-slate-50 px-2 py-1">
+                  <span>
+                    每週
+                    {s.days_of_week.split(',').map(Number).map(d => (
+                      <span key={d} className="inline-block mx-0.5 font-medium">【{DOW_LABELS[d]}】</span>
+                    ))}
+                  </span>
+                  {s.note && <span className="text-slate-400 text-xs flex-1 ml-2">{s.note}</span>}
+                  <Button
+                    size="sm" variant="ghost"
+                    className="text-red-500 hover:text-red-600 h-6 w-6 p-0"
+                    onClick={() => deleteSchedule.mutate({ id: s.id, userId: user.id })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-2">
+            <div className="flex gap-1">
+              {DOW_LABELS.map((label, i) => (
+                <button key={i} type="button" onClick={() => toggleDow(i)}
+                  className={`w-8 h-8 rounded text-sm border transition-colors ${
+                    schDows.includes(i)
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={handleAddSchedule}
+              disabled={schDows.length === 0 || addSchedule.isPending}
+            >
+              儲存排程
+            </Button>
+          </div>
+        </div>
+
+        {/* 2. 特定日期新增 */}
+        <div className="space-y-2 rounded-md border p-3">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">臨時新增特定日期</p>
           <div className="flex gap-2">
             <Input type="date" value={singleDate} onChange={e => setSingleDate(e.target.value)} className="flex-1" />
             <Input
               placeholder="備註（選填）"
               value={singleNote}
               onChange={e => setSingleNote(e.target.value)}
-              className="flex-1"
+              className="w-32"
               maxLength={200}
             />
-            <Button onClick={handleAdd} disabled={!singleDate || addDate.isPending}>新增</Button>
+            <Button onClick={handleAddDate} disabled={!singleDate || addDate.isPending}>新增</Button>
           </div>
         </div>
 
-        {/* 清單 */}
+        {/* 3. 特定日期清單 */}
         <div className="space-y-1">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-            補休早上日期（共 {dates.length} 筆）
+            特定日期（共 {dates.length} 筆）
           </p>
           {isLoading && <p className="text-sm text-slate-400">載入中...</p>}
-          {!isLoading && dates.length === 0 && <p className="text-sm text-slate-400">尚無補休早上日期</p>}
+          {!isLoading && dates.length === 0 && <p className="text-sm text-slate-400">尚無特定補休早上日期</p>}
           {dates.map((d) => (
             <div key={d.id} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
               <span className="font-mono">{d.work_date.substring(0, 10)}</span>
