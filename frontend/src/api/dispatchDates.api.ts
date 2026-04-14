@@ -5,6 +5,8 @@ export interface DispatchDate {
   id: string
   user_id: string
   work_date: string
+  clock_in_time: string | null   // HH:MM
+  clock_out_time: string | null  // HH:MM
   note: string | null
   created_at: string
 }
@@ -26,8 +28,25 @@ export function useDispatchDates(userId: string, year?: number, month?: number) 
 export function useAddDispatchDate() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { user_id: string; work_date: string; note?: string }) => {
+    mutationFn: async (payload: {
+      user_id: string; work_date: string
+      clock_in_time?: string; clock_out_time?: string; note?: string
+    }) => {
       const { data } = await apiClient.post<DispatchDate>('/dispatch-dates', payload)
+      return data
+    },
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ['dispatch-dates', vars.user_id] }),
+  })
+}
+
+export function useBulkAddDispatchDates() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      user_id: string; dates: string[]
+      clock_in_time?: string; clock_out_time?: string; note?: string
+    }) => {
+      const { data } = await apiClient.post<{ inserted: number }>('/dispatch-dates/bulk', payload)
       return data
     },
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ['dispatch-dates', vars.user_id] }),

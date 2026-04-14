@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import {
-  listDispatchDates, addDispatchDate, deleteDispatchDate,
+  listDispatchDates, addDispatchDate, bulkAddDispatchDates, deleteDispatchDate,
 } from '../repositories/dispatchDates.repository';
 import { findUserById } from '../repositories/user.repository';
 import { AppError } from '../middleware/errorHandler';
@@ -35,6 +35,8 @@ router.get(
   },
 );
 
+const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 // POST /api/v1/dispatch-dates
 router.post(
   '/',
@@ -42,17 +44,56 @@ router.post(
     body: z.object({
       user_id: z.string().uuid(),
       work_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      clock_in_time: z.string().regex(timeRegex).optional(),
+      clock_out_time: z.string().regex(timeRegex).optional(),
       note: z.string().max(200).optional(),
     }),
   }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { user_id, work_date, note } = req.body as { user_id: string; work_date: string; note?: string };
+      const { user_id, work_date, clock_in_time, clock_out_time, note } = req.body as {
+        user_id: string; work_date: string;
+        clock_in_time?: string; clock_out_time?: string; note?: string;
+      };
       const user = await findUserById(user_id);
       if (!user) throw new AppError(404, '使用者不存在');
-      if (!user.is_special_dispatch) throw new AppError(400, '此員工非特派人員');
-      const row = await addDispatchDate(user_id, work_date, note);
+      if (!user.is_special_dispatch) throw new AppError(400, '此員工非特約人員');
+      const row = await addDispatchDate(user_id, work_date, clock_in_time, clock_out_time, note);
       res.status(201).json(row);
+    } catch (e) { next(e); }
+  },
+);
+
+// POST /api/v1/dispatch-dates/bulk
+router.post(
+  '/bulk',
+  validate({
+    body: z.object({
+      user_id: z.string().uuid(),
+      dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1).max(365),
+      clock_in_time: z.string().regex(timeRegex).optional(),
+      clock_out_time: z.string().regex(timeRegex).optional(),
+      note: z.string().max(200).optional(),
+    }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { user_id, dates, clock_in_time, clock_out_time, note } = req.body as {
+        user_id: string; dates: string[];
+        clock_in_time?: string; clock_out_time?: string; note?: string;
+      };
+      const user = await findUserById(user_id);
+      if (!user) throw new AppError(404, '使用者不存在');
+      if (!user.is_special_dispatch) throw new AppError(400, '此員工非特約人員');
+      const entries = dates.map(d => ({
+        user_id,
+        work_date: d,
+        clock_in_time: clock_in_time ?? null,
+        clock_out_time: clock_out_time ?? null,
+        note: note ?? null,
+      }));
+      const count = await bulkAddDispatchDates(entries);
+      res.status(201).json({ inserted: count });
     } catch (e) { next(e); }
   },
 );

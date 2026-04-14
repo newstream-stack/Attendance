@@ -4,6 +4,7 @@ import {
 } from '../repositories/attendance.repository';
 import { getSettings } from '../repositories/systemSettings.repository';
 import { findUserById } from '../repositories/user.repository';
+import { findDispatchDateByDate } from '../repositories/dispatchDates.repository';
 import { deductLunchBreak } from '../utils/workingDays';
 import { AppError } from '../middleware/errorHandler';
 
@@ -33,13 +34,27 @@ export async function clockInService(userId: string, ipAddress: string) {
   const existing = await findTodayRecord(userId, workDate);
   if (existing) throw new AppError(409, '今日已打卡上班');
 
-  // Late detection: compare current Taipei time against work_start_time + tolerance
+  // Late detection: compare current Taipei time against expected start time + tolerance
   const [user, settings] = await Promise.all([findUserById(userId), getSettings()]);
   const now = new Date();
   const taipeiNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
   const nowMins = taipeiNow.getHours() * 60 + taipeiNow.getMinutes();
-  const [sh, sm] = settings.work_start_time.split(':').map(Number);
-  const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+
+  let startMins: number;
+  if (user?.is_special_dispatch) {
+    const dispatchDate = await findDispatchDateByDate(userId, workDate);
+    if (dispatchDate?.clock_in_time) {
+      const [dh, dm] = dispatchDate.clock_in_time.split(':').map(Number);
+      startMins = dh * 60 + dm + settings.late_tolerance_mins;
+    } else {
+      // 特約人員無指定時間 → 不計遲到
+      startMins = nowMins + 1;
+    }
+  } else {
+    const [sh, sm] = settings.work_start_time.split(':').map(Number);
+    startMins = sh * 60 + sm + settings.late_tolerance_mins;
+  }
+
   const isLate = (user?.track_attendance !== false) && nowMins > startMins;
 
   return clockIn(userId, workDate, ipAddress, isLate);
