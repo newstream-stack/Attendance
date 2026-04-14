@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/rbac';
 import { db } from '../config/database';
 import { getSettings } from '../repositories/systemSettings.repository';
 import { deductLunchBreak } from '../utils/workingDays';
+import { listDispatchDatesByUsers } from '../repositories/dispatchDates.repository';
 
 const router = Router();
 router.use(authMiddleware, requireRole('admin', 'manager'));
@@ -140,9 +141,17 @@ router.get(
 
         // 取得所有員工（含被篩選的特定員工）
         const empQ = db('users').whereNull('deleted_at').where('role', '!=', 'admin').orderBy('department').orderBy('full_name')
-          .select('id', 'employee_id', 'full_name', 'department');
+          .select('id', 'employee_id', 'full_name', 'department', 'is_special_dispatch');
         if (user_id) empQ.where('id', user_id);
-        const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null }[];
+        const employees = await empQ as { id: string; employee_id: string; full_name: string; department: string | null; is_special_dispatch: boolean }[];
+
+        // 取得特派人員的出勤日期
+        const dispatchUserIds = employees.filter(e => e.is_special_dispatch).map(e => e.id);
+        const dispatchRows = dispatchUserIds.length > 0
+          ? await listDispatchDatesByUsers(dispatchUserIds, start, end)
+          : [];
+        // dispatchSet: `${user_id}_YYYY-MM-DD`
+        const dispatchSet = new Set(dispatchRows.map(r => `${r.user_id}_${r.work_date.toString().substring(0, 10)}`));
 
         // 建立 attendance map: `${user_id}_YYYY-MM-DD` → row
         const attMap = new Map<string, AttRow>();
@@ -175,6 +184,9 @@ router.get(
 
         for (const date of dates) {
           for (const emp of employees) {
+            // 特派人員：只顯示已排定的出勤日，其他日期略過
+            if (emp.is_special_dispatch && !dispatchSet.has(`${emp.id}_${date}`)) continue;
+
             const att = attMap.get(`${emp.id}_${date}`);
             const empLeaves = leaveMap.get(emp.id) ?? [];
             const dayLeave = empLeaves.find(lr => {

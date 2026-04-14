@@ -23,6 +23,7 @@ export interface UpdateUserData {
   hire_date?: string;
   manager_id?: string | null;
   track_attendance?: boolean;
+  is_special_dispatch?: boolean;
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
@@ -107,6 +108,7 @@ export async function updateUser(id: string, data: UpdateUserData): Promise<User
   if (data.hire_date !== undefined) updates.hire_date = data.hire_date;
   if (data.manager_id !== undefined) updates.manager_id = data.manager_id;
   if (data.track_attendance !== undefined) updates.track_attendance = data.track_attendance;
+  if (data.is_special_dispatch !== undefined) updates.is_special_dispatch = data.is_special_dispatch;
 
   const [user] = await db<User>('users')
     .where({ id })

@@ -13,6 +13,7 @@ export interface UserRow {
   manager_id: string | null
   is_active: boolean
   track_attendance: boolean
+  is_special_dispatch: boolean
   must_change_password: boolean
   created_at: string
 }
@@ -33,6 +34,7 @@ export interface CreateUserPayload {
   hire_date: string
   manager_id?: string | null
   track_attendance?: boolean
+  is_special_dispatch?: boolean
 }
 
 export interface UpdateUserPayload {
@@ -45,6 +47,7 @@ export interface UpdateUserPayload {
   hire_date?: string
   manager_id?: string | null
   track_attendance?: boolean
+  is_special_dispatch?: boolean
 }
 
 export function useUsers() {

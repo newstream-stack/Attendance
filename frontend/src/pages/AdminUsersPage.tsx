@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail } from 'lucide-react'
+import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail, CalendarDays } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { useDispatchDates, useAddDispatchDate, useDeleteDispatchDate } from '@/api/dispatchDates.api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +40,7 @@ const createSchema = z.object({
   hire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '格式須為 YYYY-MM-DD'),
   manager_id: z.string().uuid().nullable().optional(),
   track_attendance: z.boolean(),
+  is_special_dispatch: z.boolean(),
 })
 
 const editSchema = createSchema
@@ -76,10 +78,11 @@ export default function AdminUsersPage() {
   const [newPassword, setNewPassword] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [sendEmailTarget, setSendEmailTarget] = useState<UserRow | null>(null)
+  const [dispatchTarget, setDispatchTarget] = useState<UserRow | null>(null)
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { role: 'employee', manager_id: null, track_attendance: true },
+    defaultValues: { role: 'employee', manager_id: null, track_attendance: true, is_special_dispatch: false },
   })
 
   const editForm = useForm<EditForm>({
@@ -110,6 +113,7 @@ export default function AdminUsersPage() {
       hire_date: user.hire_date.slice(0, 10),
       manager_id: user.manager_id,
       track_attendance: user.track_attendance,
+      is_special_dispatch: user.is_special_dispatch,
     })
   }
 
@@ -178,11 +182,16 @@ export default function AdminUsersPage() {
     { key: 'department', header: '部門', render: (row) => row.department ?? '—' },
     {
       key: 'track_attendance', header: '出勤規範',
-      render: (row) => (
-        <Badge variant={(row as unknown as UserRow).track_attendance ? 'outline' : 'secondary'}>
-          {(row as unknown as UserRow).track_attendance ? '一般' : '不計遲退'}
-        </Badge>
-      ),
+      render: (row) => {
+        const u = row as unknown as UserRow
+        return (
+          <div className="flex flex-wrap gap-1">
+            {u.is_special_dispatch && <Badge variant="outline" className="text-blue-600 border-blue-300">特派</Badge>}
+            {!u.track_attendance && <Badge variant="secondary">不計遲退</Badge>}
+            {u.track_attendance && !u.is_special_dispatch && <Badge variant="outline">一般</Badge>}
+          </div>
+        )
+      },
     },
     {
       key: 'is_active', header: '狀態',
@@ -199,6 +208,11 @@ export default function AdminUsersPage() {
           <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="編輯">
             <Pencil className="h-4 w-4" />
           </Button>
+          {(row as unknown as UserRow).is_special_dispatch && (
+            <Button size="sm" variant="ghost" className="text-blue-600 hover:text-blue-700" onClick={() => setDispatchTarget(row as unknown as UserRow)} title="管理出勤日">
+              <CalendarDays className="h-4 w-4" />
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => setSendEmailTarget(row)} title="傳送密碼重設信">
             <Mail className="h-4 w-4" />
           </Button>
@@ -322,6 +336,14 @@ export default function AdminUsersPage() {
         onConfirm={handleDelete}
       />
 
+      {/* Dispatch dates management */}
+      {dispatchTarget && (
+        <DispatchDatesDialog
+          user={dispatchTarget}
+          onClose={() => setDispatchTarget(null)}
+        />
+      )}
+
       {/* Show new password */}
       <Dialog open={!!newPassword} onOpenChange={(o) => !o && setNewPassword(null)}>
         <DialogContent className="max-w-sm">
@@ -440,25 +462,115 @@ function UserFormFields({
           )}
         />
       </FormField>
-      <Controller
-        name="track_attendance"
-        control={control}
-        render={({ field }) => (
-          <div className="flex items-center gap-3">
-            <Checkbox
-              id="track_attendance"
-              checked={field.value}
-              onCheckedChange={field.onChange}
-            />
-            <Label htmlFor="track_attendance" className="text-sm font-normal cursor-pointer">
-              計算遲到 / 早退
-              <span className="ml-1 text-slate-400">
-                {field.value ? '（啟用）' : '（停用 — 僅記錄打卡時間）'}
-              </span>
-            </Label>
-          </div>
-        )}
-      />
+      <div className="flex flex-col gap-2">
+        <Controller
+          name="track_attendance"
+          control={control}
+          render={({ field }) => (
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="track_attendance"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+              <Label htmlFor="track_attendance" className="text-sm font-normal cursor-pointer">
+                計算遲到 / 早退
+                <span className="ml-1 text-slate-400">
+                  {field.value ? '（啟用）' : '（停用 — 僅記錄打卡時間）'}
+                </span>
+              </Label>
+            </div>
+          )}
+        />
+        <Controller
+          name="is_special_dispatch"
+          control={control}
+          render={({ field }) => (
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is_special_dispatch"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+              <Label htmlFor="is_special_dispatch" className="text-sm font-normal cursor-pointer">
+                特派人員
+                <span className="ml-1 text-slate-400">（僅排定出勤日才計入出勤）</span>
+              </Label>
+            </div>
+          )}
+        />
+      </div>
     </>
+  )
+}
+
+function DispatchDatesDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  const { toast } = useToast()
+  const { data: dates = [], isLoading } = useDispatchDates(user.id)
+  const addDate = useAddDispatchDate()
+  const deleteDate = useDeleteDispatchDate()
+  const [newDate, setNewDate] = useState('')
+
+  const handleAdd = async () => {
+    if (!newDate) return
+    try {
+      await addDate.mutateAsync({ user_id: user.id, work_date: newDate })
+      setNewDate('')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast({ variant: 'destructive', title: '新增失敗', description: msg ?? '日期可能已存在' })
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDate.mutateAsync({ id, userId: user.id })
+    } catch {
+      toast({ variant: 'destructive', title: '刪除失敗' })
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>特派出勤日 — {user.full_name}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex gap-2">
+          <Input
+            type="date"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            className="flex-1"
+          />
+          <Button onClick={handleAdd} disabled={!newDate || addDate.isPending}>新增</Button>
+        </div>
+
+        <div className="space-y-1 mt-2">
+          {isLoading && <p className="text-sm text-slate-400">載入中...</p>}
+          {!isLoading && dates.length === 0 && (
+            <p className="text-sm text-slate-400">尚無排定出勤日</p>
+          )}
+          {dates.map((d) => (
+            <div key={d.id} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
+              <span>{d.work_date.substring(0, 10)}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-500 hover:text-red-600 h-6 w-6 p-0"
+                onClick={() => handleDelete(d.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>關閉</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

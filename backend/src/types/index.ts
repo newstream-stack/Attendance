@@ -25,6 +25,7 @@ export interface User {
   manager_id: string | null;
   is_active: boolean;
   track_attendance: boolean;
+  is_special_dispatch: boolean;
   must_change_password: boolean;
   password_reset_token: string | null;
   password_reset_expires: Date | null;

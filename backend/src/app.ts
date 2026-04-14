@@ -17,6 +17,7 @@ import makeupPunchRouter from './routes/makeupPunch.routes';
 import systemSettingsRouter from './routes/systemSettings.routes';
 import publicHolidayRouter from './routes/publicHoliday.routes';
 import outingRouter from './routes/outing.routes';
+import dispatchDatesRouter from './routes/dispatchDates.routes';
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api/v1/makeup-punch', makeupPunchRouter);
 app.use('/api/v1/system-settings', systemSettingsRouter);
 app.use('/api/v1/public-holidays', publicHolidayRouter);
 app.use('/api/v1/outings', outingRouter);
+app.use('/api/v1/dispatch-dates', dispatchDatesRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);
