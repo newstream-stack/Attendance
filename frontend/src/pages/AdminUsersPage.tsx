@@ -5,7 +5,11 @@ import { z } from 'zod'
 import { Plus, Pencil, UserCheck, UserX, KeyRound, Copy, Check, Trash2, Mail, CalendarDays } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { useDispatchDates, useAddDispatchDate, useBulkAddDispatchDates, useDeleteDispatchDate } from '@/api/dispatchDates.api'
+import { useDispatchDates, useAddDispatchDate, useDeleteDispatchDate } from '@/api/dispatchDates.api'
+import {
+  useDispatchSchedules, useAddDispatchSchedule, useDeleteDispatchSchedule, useApplyDispatchSchedules,
+  DOW_LABELS, parseDow, formatDow,
+} from '@/api/dispatchSchedules.api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -504,154 +508,151 @@ function UserFormFields({
   )
 }
 
-const DOW_LABELS = ['日', '一', '二', '三', '四', '五', '六']
-
-function generateDatesForDow(dowList: number[], from: string, to: string): string[] {
-  const result: string[] = []
-  const cur = new Date(from + 'T12:00:00Z')
-  const last = new Date(to + 'T12:00:00Z')
-  while (cur <= last) {
-    if (dowList.includes(cur.getUTCDay())) {
-      const y = cur.getUTCFullYear()
-      const mo = String(cur.getUTCMonth() + 1).padStart(2, '0')
-      const d = String(cur.getUTCDate()).padStart(2, '0')
-      result.push(`${y}-${mo}-${d}`)
-    }
-    cur.setUTCDate(cur.getUTCDate() + 1)
-  }
-  return result
-}
-
 function DispatchDatesDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
   const { toast } = useToast()
+
+  // 固定排程
+  const { data: schedules = [] } = useDispatchSchedules(user.id)
+  const addSchedule = useAddDispatchSchedule()
+  const deleteSchedule = useDeleteDispatchSchedule()
+  const [schDows, setSchDows] = useState<number[]>([])
+  const [schIn, setSchIn] = useState('')
+  const [schOut, setSchOut] = useState('')
+  const toggleDow = (d: number) =>
+    setSchDows(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
+
+  const handleAddSchedule = async () => {
+    if (schDows.length === 0 || !schIn || !schOut) return
+    try {
+      await addSchedule.mutateAsync({ user_id: user.id, days_of_week: formatDow(schDows), clock_in_time: schIn, clock_out_time: schOut })
+      setSchDows([]); setSchIn(''); setSchOut('')
+    } catch {
+      toast({ variant: 'destructive', title: '新增失敗' })
+    }
+  }
+
+  // 套用到期間
+  const applySchedules = useApplyDispatchSchedules()
+  const [applyFrom, setApplyFrom] = useState('')
+  const [applyTo, setApplyTo] = useState('')
+
+  const handleApply = async () => {
+    if (!applyFrom || !applyTo) return
+    try {
+      const { inserted, total } = await applySchedules.mutateAsync({ user_id: user.id, from_date: applyFrom, to_date: applyTo })
+      toast({ title: `已套用，新增 ${inserted} 筆（共 ${total} 筆，重複略過）` })
+      setApplyFrom(''); setApplyTo('')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast({ variant: 'destructive', title: '套用失敗', description: msg })
+    }
+  }
+
+  // 已排定出勤日
   const { data: dates = [], isLoading } = useDispatchDates(user.id)
   const addDate = useAddDispatchDate()
-  const bulkAdd = useBulkAddDispatchDates()
   const deleteDate = useDeleteDispatchDate()
-
-  // 單筆新增
   const [singleDate, setSingleDate] = useState('')
   const [singleIn, setSingleIn] = useState('')
   const [singleOut, setSingleOut] = useState('')
 
-  // 批次新增（每週幾）
-  const [recurDows, setRecurDows] = useState<number[]>([])
-  const [recurFrom, setRecurFrom] = useState('')
-  const [recurTo, setRecurTo] = useState('')
-  const [recurIn, setRecurIn] = useState('')
-  const [recurOut, setRecurOut] = useState('')
-
-  const toggleDow = (d: number) =>
-    setRecurDows(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
-
   const handleAddSingle = async () => {
     if (!singleDate) return
     try {
-      await addDate.mutateAsync({
-        user_id: user.id, work_date: singleDate,
-        clock_in_time: singleIn || undefined,
-        clock_out_time: singleOut || undefined,
-      })
-      setSingleDate('')
+      await addDate.mutateAsync({ user_id: user.id, work_date: singleDate, clock_in_time: singleIn || undefined, clock_out_time: singleOut || undefined })
+      setSingleDate(''); setSingleIn(''); setSingleOut('')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
       toast({ variant: 'destructive', title: '新增失敗', description: msg ?? '日期可能已存在' })
     }
   }
 
-  const handleBulkAdd = async () => {
-    if (recurDows.length === 0 || !recurFrom || !recurTo) return
-    const generated = generateDatesForDow(recurDows, recurFrom, recurTo)
-    if (generated.length === 0) {
-      toast({ variant: 'destructive', title: '無符合日期', description: '指定範圍內找不到選取的星期' })
-      return
-    }
-    try {
-      const { inserted } = await bulkAdd.mutateAsync({
-        user_id: user.id, dates: generated,
-        clock_in_time: recurIn || undefined,
-        clock_out_time: recurOut || undefined,
-      })
-      toast({ title: `已新增 ${inserted} 筆出勤日` })
-      setRecurDows([]); setRecurFrom(''); setRecurTo(''); setRecurIn(''); setRecurOut('')
-    } catch {
-      toast({ variant: 'destructive', title: '批次新增失敗' })
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteDate.mutateAsync({ id, userId: user.id })
-    } catch {
-      toast({ variant: 'destructive', title: '刪除失敗' })
-    }
-  }
-
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>特約出勤日 — {user.full_name}</DialogTitle>
         </DialogHeader>
 
-        {/* 單筆新增 */}
+        {/* 1. 固定排程設定 */}
         <div className="space-y-2 rounded-md border p-3">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">單筆新增</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">固定排程</p>
+          {schedules.length > 0 && (
+            <div className="space-y-1 mb-2">
+              {schedules.map(s => (
+                <div key={s.id} className="flex items-center justify-between text-sm rounded bg-slate-50 px-2 py-1">
+                  <span>
+                    每週
+                    {parseDow(s.days_of_week).map(d => <span key={d} className="inline-block mx-0.5 font-medium">【{DOW_LABELS[d]}】</span>)}
+                  </span>
+                  <span className="text-slate-500 font-mono text-xs">{s.clock_in_time.substring(0,5)} — {s.clock_out_time.substring(0,5)}</span>
+                  <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 h-6 w-6 p-0"
+                    onClick={() => deleteSchedule.mutate({ id: s.id, userId: user.id })}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-2">
+            <div className="flex gap-1">
+              {DOW_LABELS.map((label, i) => (
+                <button key={i} type="button" onClick={() => toggleDow(i)}
+                  className={`w-8 h-8 rounded text-sm border transition-colors ${
+                    schDows.includes(i) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Label className="text-xs text-slate-500">上班時間</Label>
+                <Input type="time" value={schIn} onChange={e => setSchIn(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs text-slate-500">下班時間</Label>
+                <Input type="time" value={schOut} onChange={e => setSchOut(e.target.value)} />
+              </div>
+              <Button onClick={handleAddSchedule} disabled={schDows.length === 0 || !schIn || !schOut || addSchedule.isPending}>
+                儲存排程
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. 套用到期間 */}
+        <div className="space-y-2 rounded-md border p-3">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">套用到期間</p>
+          <p className="text-xs text-slate-400">依上方固定排程，自動展開指定範圍內的所有出勤日</p>
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <Label className="text-xs text-slate-500">開始日期</Label>
+              <Input type="date" value={applyFrom} onChange={e => setApplyFrom(e.target.value)} />
+            </div>
+            <div className="flex-1">
+              <Label className="text-xs text-slate-500">結束日期</Label>
+              <Input type="date" value={applyTo} onChange={e => setApplyTo(e.target.value)} />
+            </div>
+            <Button onClick={handleApply} disabled={!applyFrom || !applyTo || schedules.length === 0 || applySchedules.isPending}>
+              {applySchedules.isPending ? '套用中...' : '套用'}
+            </Button>
+          </div>
+          {schedules.length === 0 && <p className="text-xs text-amber-500">請先設定固定排程</p>}
+        </div>
+
+        {/* 3. 臨時新增 / 覆蓋 */}
+        <div className="space-y-2 rounded-md border p-3">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">臨時新增 / 覆蓋時間</p>
           <div className="flex gap-2">
             <Input type="date" value={singleDate} onChange={e => setSingleDate(e.target.value)} className="flex-1" />
-            <Input type="time" value={singleIn} onChange={e => setSingleIn(e.target.value)} className="w-28" placeholder="上班" title="上班時間" />
-            <Input type="time" value={singleOut} onChange={e => setSingleOut(e.target.value)} className="w-28" placeholder="下班" title="下班時間" />
+            <Input type="time" value={singleIn} onChange={e => setSingleIn(e.target.value)} className="w-28" title="上班時間" />
+            <Input type="time" value={singleOut} onChange={e => setSingleOut(e.target.value)} className="w-28" title="下班時間" />
             <Button onClick={handleAddSingle} disabled={!singleDate || addDate.isPending}>新增</Button>
           </div>
         </div>
 
-        {/* 批次新增（每週幾） */}
-        <div className="space-y-2 rounded-md border p-3">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">批次新增（每週幾）</p>
-          <div className="flex gap-1">
-            {DOW_LABELS.map((label, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => toggleDow(i)}
-                className={`w-8 h-8 rounded text-sm border transition-colors ${
-                  recurDows.includes(i)
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs text-slate-500">開始日期</Label>
-              <Input type="date" value={recurFrom} onChange={e => setRecurFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-500">結束日期</Label>
-              <Input type="date" value={recurTo} onChange={e => setRecurTo(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-500">上班時間</Label>
-              <Input type="time" value={recurIn} onChange={e => setRecurIn(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-500">下班時間</Label>
-              <Input type="time" value={recurOut} onChange={e => setRecurOut(e.target.value)} />
-            </div>
-          </div>
-          <Button
-            className="w-full"
-            onClick={handleBulkAdd}
-            disabled={recurDows.length === 0 || !recurFrom || !recurTo || bulkAdd.isPending}
-          >
-            {bulkAdd.isPending ? '新增中...' : `批次新增`}
-          </Button>
-        </div>
-
-        {/* 已排定清單 */}
+        {/* 4. 已排定清單 */}
         <div className="space-y-1">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">已排定（共 {dates.length} 筆）</p>
           {isLoading && <p className="text-sm text-slate-400">載入中...</p>}
@@ -659,14 +660,11 @@ function DispatchDatesDialog({ user, onClose }: { user: UserRow; onClose: () => 
           {dates.map((d) => (
             <div key={d.id} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
               <span className="font-mono">{d.work_date.substring(0, 10)}</span>
-              <span className="text-slate-500 text-xs">
-                {d.clock_in_time ?? '--:--'} — {d.clock_out_time ?? '--:--'}
+              <span className="text-slate-500 text-xs font-mono">
+                {d.clock_in_time ? d.clock_in_time.substring(0,5) : '--:--'} — {d.clock_out_time ? d.clock_out_time.substring(0,5) : '--:--'}
               </span>
-              <Button
-                size="sm" variant="ghost"
-                className="text-red-500 hover:text-red-600 h-6 w-6 p-0"
-                onClick={() => handleDelete(d.id)}
-              >
+              <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 h-6 w-6 p-0"
+                onClick={() => deleteDate.mutate({ id: d.id, userId: user.id })}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
