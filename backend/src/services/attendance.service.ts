@@ -38,7 +38,6 @@ function recomputeDuration(
   const endMins = toTaipeiMinutes(record.clock_out);
   const actual = deductLunchBreak(startMins, endMins);
   const base = actual > 0 ? actual : (record.duration_mins ?? 0);
-  if (isCompMorning) return base + compMorningOffsetMins(workStartTime);
   return base > 0 ? base : record.duration_mins;
 }
 
@@ -121,9 +120,7 @@ export async function clockOutService(userId: string) {
   const startMins = toTaipeiMinutes(record.clock_in);
   const endMins = toTaipeiMinutes(new Date());
   const actual = deductLunchBreak(startMins, endMins);
-  const durationMins = isCompMorning
-    ? actual + compMorningOffsetMins(settings.work_start_time)
-    : actual;
+  const durationMins = actual;
 
   return clockOut(record.id, durationMins);
 }

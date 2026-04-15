@@ -210,7 +210,7 @@ router.get(
         if (r.clock_in && r.clock_out) {
           const actual = deductLunchBreak(toTaipeiMins(r.clock_in), toTaipeiMins(r.clock_out));
           const computed = actual > 0 ? actual : (r.duration_mins ?? 0);
-          duration_mins = comp ? computed + compMorningOffset : (computed > 0 ? computed : r.duration_mins);
+          duration_mins = computed > 0 ? computed : r.duration_mins;
         }
         return { ...r, is_comp_morning: comp, duration_mins, late_mins, early_leave_mins };
       });
