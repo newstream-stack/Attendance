@@ -46,7 +46,6 @@ export default function LeaveApprovalsPage() {
   }
 
   const columns: Column<LeaveRequest>[] = [
-    { key: 'employee_id', header: '員工編號', sortable: true },
     { key: 'applicant_name', header: '姓名', sortable: true },
     { key: 'leave_type_name', header: '假別' },
     { key: 'start_time', header: '開始', render: (r) => fmtDate(r.start_time) },

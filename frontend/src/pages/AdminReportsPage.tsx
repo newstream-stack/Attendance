@@ -384,7 +384,6 @@ export default function AdminReportsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b">
-                  <th className="text-left px-3 py-2 whitespace-nowrap font-medium text-slate-600">員工編號</th>
                   <th className="text-left px-3 py-2 whitespace-nowrap font-medium text-slate-600">姓名</th>
                   <th className="text-left px-3 py-2 whitespace-nowrap font-medium text-slate-600">部門</th>
                   <th className="text-right px-3 py-2 whitespace-nowrap font-medium text-slate-600">出勤天數</th>
@@ -420,7 +419,6 @@ export default function AdminReportsPage() {
                 ) : (
                   monthlyRows.map((row) => (
                     <tr key={row.employee_id} className="border-b hover:bg-slate-50 transition-colors">
-                      <td className="px-3 py-2 text-slate-500">{row.employee_id}</td>
                       <td className="px-3 py-2 font-medium">{row.full_name}</td>
                       <td className="px-3 py-2 text-slate-500">{row.department ?? '—'}</td>
                       <td className="px-3 py-2 text-right">{row.attend_days}</td>

@@ -7,7 +7,6 @@ import { useTodayOutings, useSearchOutings, OutingRecord } from '@/api/outing.ap
 import { useColleagues } from '@/api/users.api'
 
 const columns: Column<OutingRecord>[] = [
-  { key: 'employee_id', header: '員工編號', sortable: true },
   { key: 'full_name', header: '姓名', sortable: true },
   {
     key: 'outing_date', header: '外出日期', sortable: true,

@@ -41,7 +41,6 @@ export default function OvertimeApprovalsPage() {
   }
 
   const columns: Column<OvertimeRequest>[] = [
-    { key: 'employee_id', header: '員工編號', sortable: true },
     { key: 'full_name', header: '姓名', sortable: true },
     { key: 'work_date', header: '加班日期', sortable: true, render: (r) => new Date(r.work_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) },
     { key: 'duration_mins', header: '時數', render: (r) => fmtMins(r.duration_mins) },

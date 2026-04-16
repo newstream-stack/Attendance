@@ -53,7 +53,6 @@ export default function AdminMakeupPunchReviewPage() {
   }
 
   const columns: Column<MakeupPunchRequest>[] = [
-    { key: 'employee_id', header: '員工編號', sortable: true },
     { key: 'full_name', header: '姓名', sortable: true },
     {
       key: 'work_date', header: '補打日期', sortable: true,

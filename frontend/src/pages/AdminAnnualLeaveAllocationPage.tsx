@@ -60,7 +60,6 @@ export default function AdminAnnualLeaveAllocationPage() {
   }
 
   const columns: Column<AnnualLeavePreviewRow>[] = [
-    { key: 'employee_id', header: '員工編號', sortable: true },
     { key: 'full_name', header: '姓名', sortable: true },
     { key: 'department', header: '部門', render: (r) => r.department ?? '—' },
     { key: 'hire_date', header: '到職日', render: (r) => r.hire_date.slice(0, 10) },
