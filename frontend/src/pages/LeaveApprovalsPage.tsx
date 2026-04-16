@@ -54,6 +54,20 @@ export default function LeaveApprovalsPage() {
     { key: 'duration_mins', header: '時數', render: (r) => fmtMins(r.duration_mins) },
     { key: 'status', header: '狀態', render: (r) => <StatusBadge status={r.status} /> },
     {
+      key: 'attachment_path', header: '附件',
+      render: (r) => r.attachment_path
+        ? (
+          <button
+            type="button"
+            className="text-sm text-blue-600 underline hover:text-blue-800"
+            onClick={() => openLeaveAttachment(r.id)}
+          >
+            查看證明
+          </button>
+        )
+        : null,
+    },
+    {
       key: 'actions', header: '',
       render: (r) => (
         <div className="flex gap-2">
