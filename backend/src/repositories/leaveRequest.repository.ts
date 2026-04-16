@@ -12,6 +12,7 @@ export interface CreateLeaveRequestData {
   half_day_period?: string | null;
   reason?: string | null;
   proxy_status?: string | null;
+  attachment_path?: string | null;
 }
 
 export async function createLeaveRequest(data: CreateLeaveRequestData): Promise<LeaveRequest> {
@@ -23,11 +24,11 @@ export async function findLeaveRequestById(id: string): Promise<LeaveRequest | u
   return db<LeaveRequest>('leave_requests').where({ id }).first();
 }
 
-export async function listMyRequests(userId: string): Promise<(LeaveRequest & { leave_type_name: string })[]> {
+export async function listMyRequests(userId: string): Promise<(LeaveRequest & { leave_type_name: string; leave_type_requires_attachment: boolean })[]> {
   return db('leave_requests as lr')
     .join('leave_types as lt', 'lr.leave_type_id', 'lt.id')
     .where('lr.user_id', userId)
-    .select('lr.*', 'lt.name_zh as leave_type_name')
+    .select('lr.*', 'lt.name_zh as leave_type_name', 'lt.requires_attachment as leave_type_requires_attachment')
     .orderBy('lr.created_at', 'desc');
 }
 
@@ -81,6 +82,10 @@ export async function updateRequestStatus(
     .update({ status: status as any, updated_at: db.fn.now() })
     .returning('*');
   return row;
+}
+
+export async function updateAttachmentPath(id: string, attachmentPath: string): Promise<void> {
+  await db('leave_requests').where({ id }).update({ attachment_path: attachmentPath, updated_at: db.fn.now() });
 }
 
 export async function createApproval(data: {

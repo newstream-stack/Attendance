@@ -8,6 +8,7 @@ export interface LeaveType {
   name_en: string
   is_paid: boolean
   requires_balance: boolean
+  requires_attachment: boolean
   max_days_per_year: number | null
   carry_over_days: number
   is_active: boolean
@@ -39,10 +40,12 @@ export interface LeaveRequest {
   status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'recalled'
   proxy_status: 'pending' | 'approved' | 'rejected' | null
   proxy_comment: string | null
+  attachment_path: string | null
   submitted_at: string
   created_at: string
   // joined
   leave_type_name?: string
+  leave_type_requires_attachment?: boolean
   applicant_name?: string
   employee_id?: string
 }
@@ -243,4 +246,26 @@ export function useCancelLeaveRequest() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
   })
+}
+
+export function useUploadLeaveAttachment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const form = new FormData()
+      form.append('attachment', file)
+      await apiClient.post(`/leave/requests/${id}/attachment`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
+  })
+}
+
+export async function openLeaveAttachment(requestId: string): Promise<void> {
+  const { data } = await apiClient.get(`/leave/requests/${requestId}/attachment`, {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(data)
+  window.open(url, '_blank')
 }

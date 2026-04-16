@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
+import { upload, saveAttachment, resolveAttachmentPath } from '../middleware/upload';
 import {
   getLeaveTypes, createNewLeaveType, editLeaveType,
   getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance,
@@ -10,6 +12,7 @@ import {
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
   approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest,
   getPendingProxyRequests, proxyApproveLeave, proxyRejectLeave,
+  uploadLeaveAttachment, serveLeaveAttachment,
 } from '../services/leave.service';
 
 const router = Router();
@@ -31,6 +34,7 @@ router.post(
       name_en: z.string().min(1).max(50),
       is_paid: z.boolean(),
       requires_balance: z.boolean(),
+      requires_attachment: z.boolean().default(false),
       max_days_per_year: z.number().int().positive().nullable().optional(),
       carry_over_days: z.number().int().min(0).default(0),
       is_active: z.boolean().default(true),
@@ -50,6 +54,7 @@ router.put(
       name_en: z.string().min(1).max(50).optional(),
       is_paid: z.boolean().optional(),
       requires_balance: z.boolean().optional(),
+      requires_attachment: z.boolean().optional(),
       max_days_per_year: z.number().int().positive().nullable().optional(),
       carry_over_days: z.number().int().min(0).optional(),
       is_active: z.boolean().optional(),
@@ -167,6 +172,27 @@ router.post('/requests/:id/cancel', async (req: Request, res: Response, next: Ne
   try {
     await cancelLeaveRequest(req.params.id, req.user!.id);
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ─── Attachment ──────────────────────────────────────────────────────────────
+
+router.post('/requests/:id/attachment', upload.single('attachment'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: '請上傳附件' });
+    const filename = await saveAttachment(req.file);
+    await uploadLeaveAttachment(req.params.id, req.user!.id, filename);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.get('/requests/:id/attachment', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { filePath, mimeType } = await serveLeaveAttachment(req.params.id, req.user!);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '附件不存在' });
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', 'inline');
+    res.sendFile(filePath);
   } catch (e) { next(e); }
 });
 

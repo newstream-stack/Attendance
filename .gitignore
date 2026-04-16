@@ -54,6 +54,11 @@ Thumbs.db
 pgadmin/sessions/
 
 # ================================
+# Uploaded files (user content)
+# ================================
+backend/uploads/
+
+# ================================
 # Version Control — Keep These
 # ================================
 # .claude/ and openspec/ are intentionally tracked

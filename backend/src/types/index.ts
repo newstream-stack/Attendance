@@ -76,6 +76,7 @@ export interface LeaveType {
   name_en: string;
   is_paid: boolean;
   requires_balance: boolean;
+  requires_attachment: boolean;
   max_days_per_year: number | null;
   carry_over_days: number;
   is_active: boolean;
@@ -109,6 +110,7 @@ export interface LeaveRequest {
   proxy_status: ProxyStatus | null;
   proxy_comment: string | null;
   proxy_acted_at: Date | null;
+  attachment_path: string | null;
   submitted_at: Date;
   created_at: Date;
   updated_at: Date;

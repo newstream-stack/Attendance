@@ -1,16 +1,18 @@
+import path from 'path';
 import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } from '../repositories/leaveType.repository';
 import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
-  createApproval, CreateLeaveRequestData,
+  createApproval, CreateLeaveRequestData, updateAttachmentPath,
 } from '../repositories/leaveRequest.repository';
 import { listUsers, findUserById, findFirstAdmin } from '../repositories/user.repository';
 import { calculateWorkingMinutes } from '../utils/workingDays';
 import { calcAnnualLeaveDays, daysToMins } from '../utils/annualLeave';
 import { AppError } from '../middleware/errorHandler';
-import { LeaveType } from '../types';
+import { LeaveType, UserRole } from '../types';
 import { sendProxyRequestEmail, sendProxyRejectionEmail, sendLeaveApprovalRequestEmail } from '../utils/email';
+import { resolveAttachmentPath } from '../middleware/upload';
 
 // ─── Leave Types ─────────────────────────────────────────────────────────────
 
@@ -271,4 +273,31 @@ export async function cancelLeaveRequest(requestId: string, userId: string) {
   }
 
   await updateRequestStatus(requestId, 'cancelled');
+}
+
+// ─── Attachment ───────────────────────────────────────────────────────────────
+
+export async function uploadLeaveAttachment(requestId: string, userId: string, filename: string): Promise<void> {
+  const req = await findLeaveRequestById(requestId);
+  if (!req) throw new AppError(404, '找不到請假申請');
+  if (req.user_id !== userId) throw new AppError(403, '無權操作');
+  await updateAttachmentPath(requestId, filename);
+}
+
+export async function serveLeaveAttachment(
+  requestId: string,
+  user: { id: string; role: UserRole },
+): Promise<{ filePath: string; mimeType: string }> {
+  const req = await findLeaveRequestById(requestId);
+  if (!req) throw new AppError(404, '找不到請假申請');
+  if (!req.attachment_path) throw new AppError(404, '此申請無附件');
+
+  // Only requester, manager, or admin can view
+  if (user.role !== 'admin' && user.role !== 'manager' && req.user_id !== user.id) {
+    throw new AppError(403, '無權限查看此附件');
+  }
+
+  const filePath = resolveAttachmentPath(req.attachment_path);
+  const mimeType = req.attachment_path.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
+  return { filePath, mimeType };
 }

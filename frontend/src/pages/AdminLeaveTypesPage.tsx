@@ -19,6 +19,7 @@ const schema = z.object({
   name_en: z.string().min(1).max(50),
   is_paid: z.boolean(),
   requires_balance: z.boolean(),
+  requires_attachment: z.boolean().default(false),
   max_days_per_year: z.number().int().positive().nullable().optional(),
   carry_over_days: z.number().int().min(0).default(0),
   is_active: z.boolean().default(true),
@@ -36,7 +37,7 @@ export default function AdminLeaveTypesPage() {
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { is_paid: true, requires_balance: false, carry_over_days: 0, is_active: true },
+    defaultValues: { is_paid: true, requires_balance: false, requires_attachment: false, carry_over_days: 0, is_active: true },
   })
 
   const openEdit = (t: LeaveType) => {
@@ -44,6 +45,7 @@ export default function AdminLeaveTypesPage() {
     form.reset({
       code: t.code, name_zh: t.name_zh, name_en: t.name_en,
       is_paid: t.is_paid, requires_balance: t.requires_balance,
+      requires_attachment: t.requires_attachment,
       max_days_per_year: t.max_days_per_year ?? undefined,
       carry_over_days: t.carry_over_days, is_active: t.is_active,
     })
@@ -71,6 +73,7 @@ export default function AdminLeaveTypesPage() {
     { key: 'name_zh', header: '名稱', sortable: true },
     { key: 'is_paid', header: '有薪', render: (r) => r.is_paid ? '是' : '否' },
     { key: 'requires_balance', header: '需有餘額', render: (r) => r.requires_balance ? '是' : '否' },
+    { key: 'requires_attachment', header: '需附證明', render: (r) => r.requires_attachment ? '是' : '否' },
     { key: 'max_days_per_year', header: '年限天數', render: (r) => r.max_days_per_year ?? '無限制' },
     { key: 'is_active', header: '狀態', render: (r) => <Badge variant={r.is_active ? 'default' : 'secondary'}>{r.is_active ? '啟用' : '停用'}</Badge> },
     { key: 'actions', header: '', render: (r) => <Button size="sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button> },
@@ -82,7 +85,7 @@ export default function AdminLeaveTypesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">假別設定</h1>
-        <Button onClick={() => { setCreateOpen(true); form.reset({ is_paid: true, requires_balance: false, carry_over_days: 0, is_active: true }) }}>
+        <Button onClick={() => { setCreateOpen(true); form.reset({ is_paid: true, requires_balance: false, requires_attachment: false, carry_over_days: 0, is_active: true }) }}>
           <Plus className="h-4 w-4 mr-1" />新增假別
         </Button>
       </div>
@@ -133,6 +136,19 @@ export default function AdminLeaveTypesPage() {
                   </Select>
                 )} />
               </FormField>
+              <FormField label="需附證明" error={form.formState.errors.requires_attachment} required>
+                <Controller name="requires_attachment" control={form.control} render={({ field }) => (
+                  <Select onValueChange={(v) => field.onChange(v === 'true')} value={String(field.value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">是</SelectItem>
+                      <SelectItem value="false">否</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )} />
+              </FormField>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <FormField label="狀態" error={form.formState.errors.is_active} required>
                 <Controller name="is_active" control={form.control} render={({ field }) => (
                   <Select onValueChange={(v) => field.onChange(v === 'true')} value={String(field.value)}>

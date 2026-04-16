@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FormField } from '@/components/shared/FormField'
 import { useToast } from '@/hooks/use-toast'
-import { useLeaveTypes, useSubmitLeaveRequest } from '@/api/leave.api'
+import { useLeaveTypes, useSubmitLeaveRequest, useUploadLeaveAttachment } from '@/api/leave.api'
 import { useColleagues } from '@/api/users.api'
 
 const schema = z.object({
@@ -34,20 +34,25 @@ export default function LeaveApplyPage() {
   const { data: leaveTypes = [] } = useLeaveTypes()
   const { data: colleagues = [] } = useColleagues()
   const submitLeave = useSubmitLeaveRequest()
+  const uploadAttachment = useUploadLeaveAttachment()
   const [isHalfDay, setIsHalfDay] = useState(false)
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { half_day: false, half_day_period: null },
   })
 
+  const selectedTypeId = watch('leave_type_id')
+  const selectedType = leaveTypes.find((t) => t.id === selectedTypeId)
+
   const onSubmit = async (data: FormData) => {
     try {
-      // Convert date strings to ISO datetime (use start/end of workday in Taipei)
       const startISO = `${data.start_time}T09:00:00+08:00`
       const endISO = `${data.end_time}T18:00:00+08:00`
 
-      await submitLeave.mutateAsync({
+      const result = await submitLeave.mutateAsync({
         leave_type_id: data.leave_type_id,
         start_time: startISO,
         end_time: endISO,
@@ -56,6 +61,11 @@ export default function LeaveApplyPage() {
         work_proxy_user_id: data.work_proxy_user_id ?? null,
         reason: data.reason || null,
       })
+
+      if (attachmentFile) {
+        await uploadAttachment.mutateAsync({ id: result.id, file: attachmentFile })
+      }
+
       toast({
         title: '請假申請已送出',
         description: data.work_proxy_user_id ? '等待代理人確認後，再進入主管審核' : '等待主管審核',
@@ -159,10 +169,34 @@ export default function LeaveApplyPage() {
               />
             </FormField>
 
+            {selectedType?.requires_attachment && (
+              <FormField label="請假證明（可送出後再補上傳）">
+                <div className="space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    className="hidden"
+                    onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                      選擇檔案
+                    </Button>
+                    {attachmentFile ? (
+                      <span className="text-sm text-slate-600 truncate max-w-[200px]">{attachmentFile.name}</span>
+                    ) : (
+                      <span className="text-sm text-slate-400">未選擇（JPEG / PNG / WebP / PDF，最大 10MB）</span>
+                    )}
+                  </div>
+                </div>
+              </FormField>
+            )}
+
             <div className="flex flex-wrap gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>取消</Button>
-              <Button type="submit" disabled={submitLeave.isPending}>
-                {submitLeave.isPending ? '送出中...' : '送出申請'}
+              <Button type="submit" disabled={submitLeave.isPending || uploadAttachment.isPending}>
+                {submitLeave.isPending || uploadAttachment.isPending ? '送出中...' : '送出申請'}
               </Button>
             </div>
           </form>

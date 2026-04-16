@@ -8,6 +8,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import {
   usePendingApprovals, useApproveLeaveRequest, useRejectLeaveRequest, LeaveRequest,
+  openLeaveAttachment,
 } from '@/api/leave.api'
 
 function fmtDate(iso: string) {
@@ -88,9 +89,21 @@ export default function LeaveApprovalsPage() {
           </DialogHeader>
           <div className="space-y-3">
             {actionTarget && (
-              <p className="text-sm text-slate-600">
-                {actionTarget.req.applicant_name} — {actionTarget.req.leave_type_name}（{fmtMins(actionTarget.req.duration_mins)}）
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm text-slate-600">
+                  {actionTarget.req.applicant_name} — {actionTarget.req.leave_type_name}（{fmtMins(actionTarget.req.duration_mins)}）
+                </p>
+                {actionTarget.req.attachment_path && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openLeaveAttachment(actionTarget.req.id)}
+                  >
+                    查看請假證明
+                  </Button>
+                )}
+              </div>
             )}
             <div>
               <label className="text-sm font-medium">備註（選填）</label>
