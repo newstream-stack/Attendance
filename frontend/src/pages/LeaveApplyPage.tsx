@@ -169,8 +169,8 @@ export default function LeaveApplyPage() {
               />
             </FormField>
 
-            {selectedType?.requires_attachment && (
-              <FormField label="請假證明（可送出後再補上傳）">
+            {selectedTypeId && (
+              <FormField label="請假證明（選填，可送出後再補上傳）">
                 <div className="space-y-2">
                   <input
                     ref={fileInputRef}

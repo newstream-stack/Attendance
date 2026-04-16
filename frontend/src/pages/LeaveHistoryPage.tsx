@@ -68,16 +68,14 @@ export default function LeaveHistoryPage() {
       key: 'actions', header: '',
       render: (r) => (
         <div className="flex items-center gap-1">
-          {r.leave_type_requires_attachment && (
-            r.attachment_path ? (
-              <Button size="sm" variant="ghost" onClick={() => openLeaveAttachment(r.id)} title="查看證明">
-                <FileText className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button size="sm" variant="ghost" className="text-amber-600" onClick={() => triggerUpload(r.id)} title="上傳請假證明">
-                <Upload className="h-4 w-4" />
-              </Button>
-            )
+          {r.attachment_path ? (
+            <Button size="sm" variant="ghost" onClick={() => openLeaveAttachment(r.id)} title="查看證明">
+              <FileText className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button size="sm" variant="ghost" className="text-amber-600" onClick={() => triggerUpload(r.id)} title="上傳請假證明">
+              <Upload className="h-4 w-4" />
+            </Button>
           )}
           {['pending', 'approved'].includes(r.status) && (
             <Button size="sm" variant="ghost" className="text-red-500" onClick={() => setCancelTarget(r)}>
