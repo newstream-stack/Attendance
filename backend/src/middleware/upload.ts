@@ -12,7 +12,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 export const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 接收上限 10 MB，壓縮後遠小於此
   fileFilter: (_req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (allowed.includes(file.mimetype)) {
@@ -33,11 +33,11 @@ export async function saveAttachment(file: Express.Multer.File): Promise<string>
     return filename;
   }
 
-  // Images: resize to max 1200×1200 and convert to JPEG at 80% quality
+  // 縮至最大 800×800，65% JPEG 品質，請假證明只需清楚可讀即可
   const filename = `${id}.jpg`;
   await sharp(file.buffer)
-    .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 80 })
+    .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 65 })
     .toFile(path.join(UPLOAD_DIR, filename));
 
   return filename;
