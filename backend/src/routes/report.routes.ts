@@ -426,7 +426,7 @@ router.get(
           .whereNull('u.deleted_at')
           .where('u.role', '!=', 'admin')
           .whereBetween('a.work_date', [start, end])
-          .select('a.user_id', 'a.clock_in', 'a.clock_out'),
+          .select('a.user_id', 'a.work_date', 'a.clock_in', 'a.clock_out', 'u.is_special_dispatch'),
         db('leave_requests as lr')
           .join('users as u', 'lr.user_id', 'u.id')
           .whereNull('u.deleted_at')
@@ -438,9 +438,57 @@ router.get(
       ]);
 
       const [sh, sm] = settings.work_start_time.split(':').map(Number);
-      const startMins = sh * 60 + sm + settings.late_tolerance_mins;
+      const workStartMins = sh * 60 + sm;
+      const startMins = workStartMins + settings.late_tolerance_mins;
       const [eh, em] = settings.work_end_time.split(':').map(Number);
       const endMins = eh * 60 + em;
+      const COMP_MORNING_START = 13 * 60 + 30;
+
+      const allAttUserIds = [...new Set((attRows as { user_id: string }[]).map(r => r.user_id))];
+      const dispatchAttUserIds = [...new Set((attRows as { user_id: string; is_special_dispatch: boolean }[])
+        .filter(r => r.is_special_dispatch).map(r => r.user_id))];
+
+      const [mCompMorningDateRows, mCompMorningScheduleRows, mDispatchDateRows, mDispatchScheduleRows] = await Promise.all([
+        allAttUserIds.length > 0 ? listCompMorningDatesByUsers(allAttUserIds, start, end) : Promise.resolve([]),
+        allAttUserIds.length > 0 ? listCompMorningSchedulesByUsers(allAttUserIds) : Promise.resolve([]),
+        dispatchAttUserIds.length > 0 ? listDispatchDatesByUsers(dispatchAttUserIds, start, end) : Promise.resolve([]),
+        dispatchAttUserIds.length > 0 ? listSchedulesByUsers(dispatchAttUserIds) : Promise.resolve([]),
+      ]);
+
+      const mCompMorningDateSet = new Set(
+        mCompMorningDateRows.map((r: { user_id: string; work_date: unknown }) => `${r.user_id}_${String(r.work_date).substring(0, 10)}`),
+      );
+      const mCompMorningSchedMap = new Map<string, Set<number>>();
+      for (const s of mCompMorningScheduleRows as { user_id: string; days_of_week: string }[]) {
+        if (!mCompMorningSchedMap.has(s.user_id)) mCompMorningSchedMap.set(s.user_id, new Set());
+        s.days_of_week.split(',').map(Number).forEach(d => mCompMorningSchedMap.get(s.user_id)!.add(d));
+      }
+      const mIsCompMorning = (userId: string, dateStr: string): boolean => {
+        if (mCompMorningDateSet.has(`${userId}_${dateStr}`)) return true;
+        const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+        return mCompMorningSchedMap.get(userId)?.has(dow) ?? false;
+      };
+
+      const mDispatchDateMap = new Map<string, string | null>();
+      for (const d of mDispatchDateRows as { user_id: string; work_date: unknown; clock_in_time: string | null }[]) {
+        mDispatchDateMap.set(`${d.user_id}_${String(d.work_date).substring(0, 10)}`, d.clock_in_time);
+      }
+      const mDispatchScheduleMap = new Map<string, Map<number, string>>();
+      for (const s of mDispatchScheduleRows as { user_id: string; days_of_week: string; clock_in_time: string }[]) {
+        if (!mDispatchScheduleMap.has(s.user_id)) mDispatchScheduleMap.set(s.user_id, new Map());
+        s.days_of_week.split(',').map(Number).forEach(d => mDispatchScheduleMap.get(s.user_id)!.set(d, s.clock_in_time));
+      }
+      const mGetDispatchStartMins = (userId: string, dateStr: string): number | null => {
+        const key = `${userId}_${dateStr}`;
+        if (mDispatchDateMap.has(key)) {
+          const t = mDispatchDateMap.get(key);
+          if (t) { const [dh, dm] = t.split(':').map(Number); return dh * 60 + dm + settings.late_tolerance_mins; }
+        }
+        const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+        const schedTime = mDispatchScheduleMap.get(userId)?.get(dow);
+        if (schedTime) { const [dh, dm] = schedTime.split(':').map(Number); return dh * 60 + dm + settings.late_tolerance_mins; }
+        return null;
+      };
 
       type EmpStat = {
         employee_id: string;
@@ -472,16 +520,28 @@ router.get(
         }]),
       );
 
-      for (const r of attRows as { user_id: string; clock_in: string | null; clock_out: string | null }[]) {
+      for (const r of attRows as { user_id: string; work_date: unknown; clock_in: string | null; clock_out: string | null; is_special_dispatch: boolean }[]) {
         const emp = empMap.get(r.user_id);
         if (!emp) continue;
         emp.attend_days++;
         if (trackMap.get(r.user_id) !== false) {
+          const dateStr = toDateStr(r.work_date);
+          const comp = mIsCompMorning(r.user_id, dateStr);
           if (r.clock_in) {
-            const diff = toTaipeiMins(r.clock_in) - startMins;
-            if (diff > 0) { emp.late_count++; emp.late_mins += diff; }
+            let effectiveStart: number | null;
+            if (comp) {
+              effectiveStart = COMP_MORNING_START + settings.late_tolerance_mins;
+            } else if (r.is_special_dispatch) {
+              effectiveStart = mGetDispatchStartMins(r.user_id, dateStr);
+            } else {
+              effectiveStart = startMins;
+            }
+            if (effectiveStart !== null) {
+              const diff = toTaipeiMins(r.clock_in) - effectiveStart;
+              if (diff > 0) { emp.late_count++; emp.late_mins += diff; }
+            }
           }
-          if (r.clock_out) {
+          if (r.clock_out && !comp) {
             const diff = endMins - toTaipeiMins(r.clock_out);
             if (diff > 0) { emp.early_count++; emp.early_mins += diff; }
           }

@@ -399,7 +399,7 @@ export default function AdminReportsPage() {
                 </tr>
                 {monthlyLeaveTypes.length > 0 && (
                   <tr className="bg-slate-50 border-b text-xs text-slate-500">
-                    <th colSpan={8} />
+                    <th colSpan={7} />
                     {monthlyLeaveTypes.map((lt) => (
                       <>
                         <th key={`${lt.id}-count`} className="text-right px-3 py-1 border-l">次數</th>
