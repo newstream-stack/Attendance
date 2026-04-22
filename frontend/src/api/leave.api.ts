@@ -149,11 +149,21 @@ export function useAdjustLeaveBalance() {
 
 // ─── Leave Requests ───────────────────────────────────────────────────────────
 
-export function useMyLeaveRequests() {
+export interface LeaveRequestFilters {
+  startDate?: string
+  endDate?: string
+  leaveTypeId?: string
+}
+
+export function useMyLeaveRequests(filters?: LeaveRequestFilters) {
   return useQuery({
-    queryKey: ['leave-requests', 'mine'],
+    queryKey: ['leave-requests', 'mine', filters],
     queryFn: async () => {
-      const { data } = await apiClient.get<LeaveRequest[]>('/leave/requests')
+      const params: Record<string, string> = {}
+      if (filters?.startDate) params.start_date = filters.startDate
+      if (filters?.endDate) params.end_date = filters.endDate
+      if (filters?.leaveTypeId) params.leave_type_id = filters.leaveTypeId
+      const { data } = await apiClient.get<LeaveRequest[]>('/leave/requests', { params })
       return data
     },
   })

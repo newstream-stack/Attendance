@@ -114,7 +114,10 @@ router.put(
 // ─── Leave Requests ───────────────────────────────────────────────────────────
 
 router.get('/requests', async (req: Request, res: Response, next: NextFunction) => {
-  try { res.json(await getMyLeaveRequests(req.user!.id)); } catch (e) { next(e); }
+  try {
+    const { start_date, end_date, leave_type_id } = req.query as Record<string, string | undefined>;
+    res.json(await getMyLeaveRequests(req.user!.id, { startDate: start_date, endDate: end_date, leaveTypeId: leave_type_id }));
+  } catch (e) { next(e); }
 });
 
 router.get('/requests/pending-approval', requireRole('admin', 'manager'), async (req: Request, res: Response, next: NextFunction) => {

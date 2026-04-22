@@ -24,12 +24,19 @@ export async function findLeaveRequestById(id: string): Promise<LeaveRequest | u
   return db<LeaveRequest>('leave_requests').where({ id }).first();
 }
 
-export async function listMyRequests(userId: string): Promise<(LeaveRequest & { leave_type_name: string; leave_type_requires_attachment: boolean })[]> {
-  return db('leave_requests as lr')
+export async function listMyRequests(
+  userId: string,
+  filters?: { startDate?: string; endDate?: string; leaveTypeId?: string },
+): Promise<(LeaveRequest & { leave_type_name: string; leave_type_requires_attachment: boolean })[]> {
+  const q = db('leave_requests as lr')
     .join('leave_types as lt', 'lr.leave_type_id', 'lt.id')
     .where('lr.user_id', userId)
     .select('lr.*', 'lt.name_zh as leave_type_name', 'lt.requires_attachment as leave_type_requires_attachment')
-    .orderBy('lr.created_at', 'desc');
+    .orderBy('lr.start_time', 'desc');
+  if (filters?.startDate) q.where('lr.start_time', '>=', filters.startDate);
+  if (filters?.endDate) q.where('lr.start_time', '<=', filters.endDate);
+  if (filters?.leaveTypeId) q.where('lr.leave_type_id', filters.leaveTypeId);
+  return q;
 }
 
 export async function listPendingForApprover(approverId: string, isAdmin: boolean): Promise<(LeaveRequest & {

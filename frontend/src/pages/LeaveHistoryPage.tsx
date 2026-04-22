@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { DataTable, Column } from '@/components/shared/DataTable'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
-import { useMyLeaveRequests, useCancelLeaveRequest, useUploadLeaveAttachment, openLeaveAttachment, LeaveRequest } from '@/api/leave.api'
+import { useMyLeaveRequests, useCancelLeaveRequest, useUploadLeaveAttachment, openLeaveAttachment, useLeaveTypes, LeaveRequest } from '@/api/leave.api'
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
@@ -17,9 +17,29 @@ function fmtMins(mins: number) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
+function currentMonthRange() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  return {
+    start: `${y}-${m}-01`,
+    end: `${y}-${m}-${new Date(y, now.getMonth() + 1, 0).getDate().toString().padStart(2, '0')}`,
+  }
+}
+
 export default function LeaveHistoryPage() {
   const { toast } = useToast()
-  const { data: requests = [], isLoading } = useMyLeaveRequests()
+  const defaultRange = currentMonthRange()
+  const [startDate, setStartDate] = useState(defaultRange.start)
+  const [endDate, setEndDate] = useState(defaultRange.end)
+  const [leaveTypeId, setLeaveTypeId] = useState('')
+
+  const { data: requests = [], isLoading } = useMyLeaveRequests({
+    startDate,
+    endDate,
+    leaveTypeId: leaveTypeId || undefined,
+  })
+  const { data: leaveTypes = [] } = useLeaveTypes()
   const cancelRequest = useCancelLeaveRequest()
   const uploadAttachment = useUploadLeaveAttachment()
   const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(null)
@@ -103,10 +123,56 @@ export default function LeaveHistoryPage() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-500">開始日期</label>
+          <input
+            type="date"
+            className="rounded-md border border-input px-3 py-1.5 text-sm"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-500">結束日期</label>
+          <input
+            type="date"
+            className="rounded-md border border-input px-3 py-1.5 text-sm"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-500">假別</label>
+          <select
+            className="rounded-md border border-input px-3 py-1.5 text-sm"
+            value={leaveTypeId}
+            onChange={(e) => setLeaveTypeId(e.target.value)}
+          >
+            <option value="">全部假別</option>
+            {leaveTypes.map((lt) => (
+              <option key={lt.id} value={lt.id}>{lt.name_zh}</option>
+            ))}
+          </select>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const r = currentMonthRange()
+            setStartDate(r.start)
+            setEndDate(r.end)
+            setLeaveTypeId('')
+          }}
+        >
+          重設
+        </Button>
+      </div>
+
       <DataTable
         data={requests as unknown as Record<string, unknown>[]}
         columns={columns as Column<Record<string, unknown>>[]}
-        emptyText={isLoading ? '載入中...' : '尚無請假紀錄'}
+        emptyText={isLoading ? '載入中...' : '查無請假紀錄'}
       />
 
       <ConfirmDialog

@@ -191,8 +191,11 @@ export async function submitLeaveRequest(data: {
   return leaveReq;
 }
 
-export async function getMyLeaveRequests(userId: string) {
-  return listMyRequests(userId);
+export async function getMyLeaveRequests(
+  userId: string,
+  filters?: { startDate?: string; endDate?: string; leaveTypeId?: string },
+) {
+  return listMyRequests(userId, filters);
 }
 
 export async function getPendingForApprover(approverId: string, isAdmin: boolean) {
