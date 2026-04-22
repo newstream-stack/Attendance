@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { DataTable, Column } from '@/components/shared/DataTable'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
-import { useMyLeaveRequests, useCancelLeaveRequest, useUploadLeaveAttachment, openLeaveAttachment, useLeaveTypes, LeaveRequest } from '@/api/leave.api'
+import { useMyLeaveRequests, useCancelLeaveRequest, useDeleteLeaveRequest, useUploadLeaveAttachment, openLeaveAttachment, useLeaveTypes, LeaveRequest } from '@/api/leave.api'
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
@@ -41,8 +41,10 @@ export default function LeaveHistoryPage() {
   })
   const { data: leaveTypes = [] } = useLeaveTypes()
   const cancelRequest = useCancelLeaveRequest()
+  const deleteRequest = useDeleteLeaveRequest()
   const uploadAttachment = useUploadLeaveAttachment()
   const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<LeaveRequest | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null)
 
@@ -55,6 +57,18 @@ export default function LeaveHistoryPage() {
       toast({ variant: 'destructive', title: '取消失敗' })
     } finally {
       setCancelTarget(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteRequest.mutateAsync(deleteTarget.id)
+      toast({ title: '已刪除申請' })
+    } catch {
+      toast({ variant: 'destructive', title: '刪除失敗' })
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
@@ -97,7 +111,12 @@ export default function LeaveHistoryPage() {
               <Upload className="h-4 w-4" />
             </Button>
           )}
-          {['pending', 'approved'].includes(r.status) && (
+          {r.status === 'pending' && (
+            <Button size="sm" variant="ghost" className="text-red-500" onClick={() => setDeleteTarget(r)}>
+              刪除
+            </Button>
+          )}
+          {r.status === 'approved' && (
             <Button size="sm" variant="ghost" className="text-red-500" onClick={() => setCancelTarget(r)}>
               取消
             </Button>
@@ -182,6 +201,15 @@ export default function LeaveHistoryPage() {
         description={`確定要取消 ${cancelTarget?.leave_type_name ?? ''} 申請？`}
         confirmLabel="確定取消"
         onConfirm={handleCancel}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="刪除請假申請"
+        description={`確定要刪除 ${deleteTarget?.leave_type_name ?? ''} 申請？此操作無法復原。`}
+        confirmLabel="確定刪除"
+        onConfirm={handleDelete}
       />
     </div>
   )

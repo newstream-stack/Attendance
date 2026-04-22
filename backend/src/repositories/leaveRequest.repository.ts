@@ -91,6 +91,10 @@ export async function updateRequestStatus(
   return row;
 }
 
+export async function deleteLeaveRequestById(id: string): Promise<void> {
+  await db('leave_requests').where({ id }).delete();
+}
+
 export async function updateAttachmentPath(id: string, attachmentPath: string): Promise<void> {
   await db('leave_requests').where({ id }).update({ attachment_path: attachmentPath, updated_at: db.fn.now() });
 }

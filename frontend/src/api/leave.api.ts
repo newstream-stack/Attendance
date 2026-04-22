@@ -258,6 +258,16 @@ export function useCancelLeaveRequest() {
   })
 }
 
+export function useDeleteLeaveRequest() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/leave/requests/${id}`)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
+  })
+}
+
 export function useUploadLeaveAttachment() {
   const qc = useQueryClient()
   return useMutation({

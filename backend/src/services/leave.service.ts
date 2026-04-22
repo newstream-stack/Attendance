@@ -4,7 +4,7 @@ import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, 
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
-  createApproval, CreateLeaveRequestData, updateAttachmentPath,
+  createApproval, CreateLeaveRequestData, updateAttachmentPath, deleteLeaveRequestById,
 } from '../repositories/leaveRequest.repository';
 import { listUsers, findUserById, findFirstAdmin } from '../repositories/user.repository';
 import { calculateWorkingMinutes } from '../utils/workingDays';
@@ -257,6 +257,14 @@ export async function proxyRejectLeave(requestId: string, proxyId: string, comme
     sendProxyRejectionEmail(requester.email, requester.full_name, proxy.full_name)
       .catch((e) => console.error('[email] proxy rejection email failed:', e));
   }
+}
+
+export async function deleteLeaveRequest(requestId: string, userId: string) {
+  const req = await findLeaveRequestById(requestId);
+  if (!req) throw new AppError(404, '找不到請假申請');
+  if (req.user_id !== userId) throw new AppError(403, '無權操作');
+  if (req.status !== 'pending') throw new AppError(400, '只有待審核的申請可以刪除');
+  await deleteLeaveRequestById(requestId);
 }
 
 export async function cancelLeaveRequest(requestId: string, userId: string) {

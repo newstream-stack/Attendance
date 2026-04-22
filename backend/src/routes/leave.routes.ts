@@ -10,7 +10,7 @@ import {
   getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance,
   previewAnnualLeave, getAllAnnualBalances,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
-  approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest,
+  approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, deleteLeaveRequest,
   getPendingProxyRequests, proxyApproveLeave, proxyRejectLeave,
   uploadLeaveAttachment, serveLeaveAttachment,
 } from '../services/leave.service';
@@ -174,6 +174,13 @@ router.post('/requests/:id/reject', requireRole('admin', 'manager'), actionSchem
 router.post('/requests/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await cancelLeaveRequest(req.params.id, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.delete('/requests/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await deleteLeaveRequest(req.params.id, req.user!.id);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
