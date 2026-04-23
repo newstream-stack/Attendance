@@ -133,6 +133,20 @@ export function useAnnualLeavePreview(year: number) {
   })
 }
 
+export function useSetAnnualAllocated() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ user_id, year, allocated_mins }: { user_id: string; year: number; allocated_mins: number }) => {
+      const { data } = await apiClient.put('/leave/balances/set-allocated', { user_id, year, allocated_mins })
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['annual-preview'] })
+      qc.invalidateQueries({ queryKey: ['leave-balances'] })
+    },
+  })
+}
+
 export function useAdjustLeaveBalance() {
   const qc = useQueryClient()
   return useMutation({

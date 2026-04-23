@@ -91,6 +91,18 @@ export async function accumulateBalance(
     .merge({ allocated_mins: db.raw('leave_balances.allocated_mins + ?', [additionalMins]) });
 }
 
+/** Set allocated_mins directly (creates row if not exists) */
+export async function setAllocatedBalance(
+  userId: string, leaveTypeId: string, year: number, allocatedMins: number,
+): Promise<LeaveBalance> {
+  const [row] = await db<LeaveBalance>('leave_balances')
+    .insert({ user_id: userId, leave_type_id: leaveTypeId, year, allocated_mins: allocatedMins })
+    .onConflict(['user_id', 'leave_type_id', 'year'])
+    .merge({ allocated_mins: allocatedMins })
+    .returning('*');
+  return row;
+}
+
 /** Upsert adjusted_mins for a balance row (creates row if not exists) */
 export async function upsertAdjustedBalance(
   userId: string, leaveTypeId: string, year: number, adjustedMins: number,

@@ -7,7 +7,7 @@ import { requireRole } from '../middleware/rbac';
 import { upload, saveAttachment, resolveAttachmentPath } from '../middleware/upload';
 import {
   getLeaveTypes, createNewLeaveType, editLeaveType,
-  getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance,
+  getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance, setAnnualAllocatedMins,
   previewAnnualLeave, getAllAnnualBalances,
   getCompBalances, adjustCompBalance,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
@@ -123,6 +123,23 @@ router.put(
   async (req, res, next) => {
     try {
       res.json(await adjustCompBalance(req.body.user_id, req.body.year, req.body.adjusted_mins));
+    } catch (e) { next(e); }
+  },
+);
+
+router.put(
+  '/balances/set-allocated',
+  requireRole('admin'),
+  validate({
+    body: z.object({
+      user_id: z.string().uuid(),
+      year: z.number().int().min(2000).max(2100),
+      allocated_mins: z.number().int().min(0),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      res.json(await setAnnualAllocatedMins(req.body.user_id, req.body.year, req.body.allocated_mins));
     } catch (e) { next(e); }
   },
 );

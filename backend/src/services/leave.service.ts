@@ -1,6 +1,6 @@
 import path from 'path';
 import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } from '../repositories/leaveType.repository';
-import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance, upsertAdjustedBalance } from '../repositories/leaveBalance.repository';
+import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance, upsertAdjustedBalance, setAllocatedBalance } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
@@ -112,6 +112,12 @@ export async function getAllAnnualBalances(year: number) {
 
 export async function adjustLeaveBalance(balanceId: string, adjustedMins: number) {
   return adjustBalance(balanceId, adjustedMins);
+}
+
+export async function setAnnualAllocatedMins(userId: string, year: number, allocatedMins: number) {
+  const annualType = (await listLeaveTypes(false)).find((t) => t.code === 'annual');
+  if (!annualType) throw new AppError(500, '找不到年假假別');
+  return setAllocatedBalance(userId, annualType.id, year, allocatedMins);
 }
 
 export async function getCompBalances(year: number) {

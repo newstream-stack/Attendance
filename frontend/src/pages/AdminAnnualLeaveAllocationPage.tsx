@@ -11,6 +11,7 @@ import {
   useAnnualLeavePreview,
   useAllocateAnnual,
   useAdjustLeaveBalance,
+  useSetAnnualAllocated,
   AnnualLeavePreviewRow,
 } from '@/api/leave.api'
 
@@ -32,9 +33,13 @@ export default function AdminAnnualLeaveAllocationPage() {
   const { data: rows = [], isLoading, refetch } = useAnnualLeavePreview(queryYear)
   const allocate = useAllocateAnnual()
   const adjust = useAdjustLeaveBalance()
+  const setAllocated = useSetAnnualAllocated()
 
   const [adjustTarget, setAdjustTarget] = useState<AnnualLeavePreviewRow | null>(null)
   const [adjustMins, setAdjustMins] = useState('')
+
+  const [allocateTarget, setAllocateTarget] = useState<AnnualLeavePreviewRow | null>(null)
+  const [allocateHrs, setAllocateHrs] = useState('')
 
   const handleAllocate = async () => {
     try {
@@ -43,6 +48,19 @@ export default function AdminAnnualLeaveAllocationPage() {
       refetch()
     } catch {
       toast({ variant: 'destructive', title: '配發失敗' })
+    }
+  }
+
+  const handleSetAllocated = async () => {
+    if (!allocateTarget) return
+    const hrs = parseFloat(allocateHrs)
+    if (isNaN(hrs) || hrs < 0) return
+    try {
+      await setAllocated.mutateAsync({ user_id: allocateTarget.user_id, year: queryYear, allocated_mins: Math.round(hrs * 60) })
+      toast({ title: '已更新配發時數' })
+      setAllocateTarget(null)
+    } catch {
+      toast({ variant: 'destructive', title: '更新失敗' })
     }
   }
 
@@ -73,7 +91,14 @@ export default function AdminAnnualLeaveAllocationPage() {
     {
       key: 'allocated_mins',
       header: '已配發',
-      render: (r) => r.allocated_mins === 0 ? '—' : `${minsToDay(r.allocated_mins)} 天（${fmtMins(r.allocated_mins)}）`,
+      render: (r) => r.statutory_days === 0 ? '—' : (
+        <button
+          className="text-left hover:underline hover:text-blue-600 cursor-pointer"
+          onClick={() => { setAllocateTarget(r); setAllocateHrs(String(r.allocated_mins / 60)) }}
+        >
+          {r.allocated_mins === 0 ? '—' : `${minsToDay(r.allocated_mins)} 天（${fmtMins(r.allocated_mins)}）`}
+        </button>
+      ),
     },
     {
       key: 'remaining_mins',
@@ -139,6 +164,35 @@ export default function AdminAnnualLeaveAllocationPage() {
         emptyText={isLoading ? '載入中...' : '查無資料，請先執行配發'}
         pageSize={20}
       />
+
+      <Dialog open={!!allocateTarget} onOpenChange={(o) => !o && setAllocateTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>手動設定配發時數 — {allocateTarget?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">
+              直接設定此員工 {queryYear} 年的配發時數（小時）。此操作會覆蓋現有配發值。
+            </p>
+            <div>
+              <label className="text-sm font-medium">配發小時數</label>
+              <Input
+                type="number"
+                step="0.5"
+                min="0"
+                className="mt-1"
+                placeholder="例：120（= 15天）"
+                value={allocateHrs}
+                onChange={(e) => setAllocateHrs(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAllocateTarget(null)}>取消</Button>
+            <Button onClick={handleSetAllocated} disabled={setAllocated.isPending}>確認設定</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!adjustTarget} onOpenChange={(o) => !o && setAdjustTarget(null)}>
         <DialogContent>
