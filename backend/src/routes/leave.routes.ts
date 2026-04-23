@@ -9,6 +9,7 @@ import {
   getLeaveTypes, createNewLeaveType, editLeaveType,
   getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance,
   previewAnnualLeave, getAllAnnualBalances,
+  getCompBalances, adjustCompBalance,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
   approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, deleteLeaveRequest,
   getPendingProxyRequests, proxyApproveLeave, proxyRejectLeave,
@@ -101,6 +102,30 @@ router.get('/annual-preview', requireRole('admin'), async (req: Request, res: Re
     res.json(await previewAnnualLeave(year));
   } catch (e) { next(e); }
 });
+
+router.get('/balances/comp', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    res.json(await getCompBalances(year));
+  } catch (e) { next(e); }
+});
+
+router.put(
+  '/balances/comp/adjust',
+  requireRole('admin'),
+  validate({
+    body: z.object({
+      user_id: z.string().uuid(),
+      year: z.number().int().min(2000).max(2100),
+      adjusted_mins: z.number().int(),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      res.json(await adjustCompBalance(req.body.user_id, req.body.year, req.body.adjusted_mins));
+    } catch (e) { next(e); }
+  },
+);
 
 router.put(
   '/balances/:id/adjust',

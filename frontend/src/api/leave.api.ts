@@ -147,6 +147,42 @@ export function useAdjustLeaveBalance() {
   })
 }
 
+export interface CompBalanceRow {
+  user_id: string
+  employee_id: string
+  full_name: string
+  department: string | null
+  balance_id: string | null
+  allocated_mins: number
+  used_mins: number
+  carried_mins: number
+  adjusted_mins: number
+  remaining_mins: number
+}
+
+export function useCompBalances(year: number) {
+  return useQuery({
+    queryKey: ['comp-balances', year],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CompBalanceRow[]>('/leave/balances/comp', { params: { year } })
+      return data
+    },
+  })
+}
+
+export function useAdjustCompBalance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ user_id, year, adjusted_mins }: { user_id: string; year: number; adjusted_mins: number }) => {
+      const { data } = await apiClient.put('/leave/balances/comp/adjust', { user_id, year, adjusted_mins })
+      return data
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['comp-balances', vars.year] })
+    },
+  })
+}
+
 // ─── Leave Requests ───────────────────────────────────────────────────────────
 
 export interface LeaveRequestFilters {

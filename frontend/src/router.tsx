@@ -26,6 +26,7 @@ import MakeupPunchHistoryPage from '@/pages/MakeupPunchHistoryPage'
 import AdminMakeupPunchReviewPage from '@/pages/AdminMakeupPunchReviewPage'
 import AdminMakeupPunchRulesPage from '@/pages/AdminMakeupPunchRulesPage'
 import AdminAnnualLeaveAllocationPage from '@/pages/AdminAnnualLeaveAllocationPage'
+import AdminCompLeaveBalancePage from '@/pages/AdminCompLeaveBalancePage'
 import AdminSystemSettingsPage from '@/pages/AdminSystemSettingsPage'
 import AdminPublicHolidaysPage from '@/pages/AdminPublicHolidaysPage'
 import OutingPage from '@/pages/OutingPage'
@@ -100,6 +101,7 @@ export const router = createBrowserRouter([
       { path: '/admin/makeup-punch/review', element: <AdminMakeupPunchReviewPage /> },
       { path: '/admin/makeup-punch/rules', element: <AdminMakeupPunchRulesPage /> },
       { path: '/admin/annual-leave', element: <AdminAnnualLeaveAllocationPage /> },
+      { path: '/admin/comp-leave', element: <AdminCompLeaveBalancePage /> },
       { path: '/admin/system-settings', element: <AdminSystemSettingsPage /> },
       { path: '/admin/public-holidays', element: <AdminPublicHolidaysPage /> },
       { path: '/outing', element: <OutingPage /> },

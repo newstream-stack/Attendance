@@ -1,6 +1,19 @@
 import { db } from '../config/database';
 import { LeaveBalance } from '../types';
 
+export interface CompBalanceRow {
+  user_id: string;
+  employee_id: string;
+  full_name: string;
+  department: string | null;
+  balance_id: string | null;
+  allocated_mins: number;
+  used_mins: number;
+  carried_mins: number;
+  adjusted_mins: number;
+  remaining_mins: number;
+}
+
 export async function getBalances(userId: string, year: number): Promise<LeaveBalance[]> {
   return db<LeaveBalance>('leave_balances').where({ user_id: userId, year });
 }
@@ -76,4 +89,16 @@ export async function accumulateBalance(
     .insert({ user_id: userId, leave_type_id: leaveTypeId, year, allocated_mins: additionalMins })
     .onConflict(['user_id', 'leave_type_id', 'year'])
     .merge({ allocated_mins: db.raw('leave_balances.allocated_mins + ?', [additionalMins]) });
+}
+
+/** Upsert adjusted_mins for a balance row (creates row if not exists) */
+export async function upsertAdjustedBalance(
+  userId: string, leaveTypeId: string, year: number, adjustedMins: number,
+): Promise<LeaveBalance> {
+  const [row] = await db<LeaveBalance>('leave_balances')
+    .insert({ user_id: userId, leave_type_id: leaveTypeId, year, adjusted_mins: adjustedMins })
+    .onConflict(['user_id', 'leave_type_id', 'year'])
+    .merge({ adjusted_mins: adjustedMins })
+    .returning('*');
+  return row;
 }

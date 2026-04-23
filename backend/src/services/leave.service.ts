@@ -1,6 +1,6 @@
 import path from 'path';
 import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } from '../repositories/leaveType.repository';
-import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance } from '../repositories/leaveBalance.repository';
+import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance, upsertAdjustedBalance } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
@@ -112,6 +112,42 @@ export async function getAllAnnualBalances(year: number) {
 
 export async function adjustLeaveBalance(balanceId: string, adjustedMins: number) {
   return adjustBalance(balanceId, adjustedMins);
+}
+
+export async function getCompBalances(year: number) {
+  const users = await listUsers();
+  const active = users.filter((u) => u.is_active && !u.deleted_at);
+  const compType = (await listLeaveTypes(false)).find((t) => t.code === 'comp');
+  if (!compType) throw new AppError(500, '找不到補休假別');
+
+  const allBalances = await listAllWithUsers(year, compType.id);
+
+  return active.map((u) => {
+    const existing = allBalances.find((b) => b.user_id === u.id);
+    const allocated_mins = existing?.allocated_mins ?? 0;
+    const used_mins = existing?.used_mins ?? 0;
+    const carried_mins = existing?.carried_mins ?? 0;
+    const adjusted_mins = existing?.adjusted_mins ?? 0;
+    const remaining_mins = allocated_mins + carried_mins + adjusted_mins - used_mins;
+    return {
+      user_id: u.id,
+      employee_id: u.employee_id,
+      full_name: u.full_name,
+      department: u.department ?? null,
+      balance_id: existing?.id ?? null,
+      allocated_mins,
+      used_mins,
+      carried_mins,
+      adjusted_mins,
+      remaining_mins,
+    };
+  });
+}
+
+export async function adjustCompBalance(userId: string, year: number, adjustedMins: number) {
+  const compType = (await listLeaveTypes(false)).find((t) => t.code === 'comp');
+  if (!compType) throw new AppError(500, '找不到補休假別');
+  return upsertAdjustedBalance(userId, compType.id, year, adjustedMins);
 }
 
 // ─── Leave Requests ───────────────────────────────────────────────────────────

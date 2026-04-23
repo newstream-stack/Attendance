@@ -32,6 +32,7 @@ const navItems: NavItem[] = [
   { label: '打卡 IP 管理', to: '/admin/allowed-ips', icon: <Shield className="h-5 w-5" />, roles: ['admin'] },
   { label: '假別設定', to: '/admin/leave-types', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
   { label: '年假管理', to: '/admin/annual-leave', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin'] },
+  { label: '補休管理', to: '/admin/comp-leave', icon: <CalendarOff className="h-5 w-5" />, roles: ['admin'] },
   { label: '外出記錄', to: '/admin/outings', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['admin', 'manager'] },
   { label: '補打卡審核', to: '/admin/makeup-punch/review', icon: <ClipboardEdit className="h-5 w-5" />, roles: ['admin', 'manager'] },
   { label: '補打卡規則', to: '/admin/makeup-punch/rules', icon: <Settings className="h-5 w-5" />, roles: ['admin'] },
