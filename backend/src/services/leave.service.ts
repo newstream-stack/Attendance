@@ -57,7 +57,7 @@ export async function allocateAnnualForUser(userId: string, hireDate: string, ye
 
   const days = calcAnnualLeaveDays(hireDate, new Date(`${year}-01-01`));
   if (days === 0) return; // not yet eligible
-  const mins = daysToMins(days);
+  const mins = Math.round(daysToMins(days));
   await accumulateBalance(userId, annualType.id, year, mins);
 }
 

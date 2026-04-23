@@ -86,7 +86,7 @@ export default function AdminAnnualLeaveAllocationPage() {
       header: '法定天數',
       render: (r) => r.statutory_days === 0
         ? <Badge variant="secondary">未達資格</Badge>
-        : `${r.statutory_days} 天`,
+        : `${Number(r.statutory_days).toFixed(2)} 天（${(Number(r.statutory_days) * 8).toFixed(2)}h）`,
     },
     {
       key: 'allocated_mins',
