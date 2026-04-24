@@ -8,6 +8,7 @@ import { upload, saveAttachment, resolveAttachmentPath } from '../middleware/upl
 import {
   getLeaveTypes, createNewLeaveType, editLeaveType,
   getMyBalances, getMyAllBalances, allocateAnnualAll, adjustLeaveBalance, setAnnualAllocatedMins,
+  setAnnualStatutoryDaysOverride,
   previewAnnualLeave, getAllAnnualBalances,
   getCompBalances, adjustCompBalance,
   submitLeaveRequest, getMyLeaveRequests, getPendingForApprover,
@@ -140,6 +141,23 @@ router.put(
   async (req, res, next) => {
     try {
       res.json(await setAnnualAllocatedMins(req.body.user_id, req.body.year, req.body.allocated_mins));
+    } catch (e) { next(e); }
+  },
+);
+
+router.put(
+  '/balances/set-statutory-override',
+  requireRole('admin'),
+  validate({
+    body: z.object({
+      user_id: z.string().uuid(),
+      year: z.number().int().min(2000).max(2100),
+      override_days: z.number().min(0).max(365).nullable(),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      res.json(await setAnnualStatutoryDaysOverride(req.body.user_id, req.body.year, req.body.override_days));
     } catch (e) { next(e); }
   },
 );

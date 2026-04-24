@@ -1,6 +1,6 @@
 import path from 'path';
 import { listLeaveTypes, findLeaveTypeById, createLeaveType, updateLeaveType } from '../repositories/leaveType.repository';
-import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance, upsertAdjustedBalance, setAllocatedBalance } from '../repositories/leaveBalance.repository';
+import { getBalances, getAllBalances, getBalance, upsertBalance, deductBalance, restoreBalance, adjustBalance, listAllWithUsers, accumulateBalance, upsertAdjustedBalance, setAllocatedBalance, setStatutoryDaysOverride } from '../repositories/leaveBalance.repository';
 import {
   createLeaveRequest, findLeaveRequestById, listMyRequests,
   listPendingForApprover, listPendingProxyRequests, updateRequestStatus, updateProxyStatus,
@@ -80,7 +80,10 @@ export async function previewAnnualLeave(year: number) {
 
   return active.map((u) => {
     const existing = allBalances.find((b) => b.user_id === u.id);
-    const statutory_days = calcAnnualLeaveDays(u.hire_date, new Date(`${year}-01-01`));
+    const calculated_days = calcAnnualLeaveDays(u.hire_date, new Date(`${year}-01-01`));
+    const statutory_days = existing?.statutory_days_override != null
+      ? Number(existing.statutory_days_override)
+      : calculated_days;
     const allocated_mins = existing?.allocated_mins ?? 0;
     const used_mins = existing?.used_mins ?? 0;
     const carried_mins = existing?.carried_mins ?? 0;
@@ -94,6 +97,7 @@ export async function previewAnnualLeave(year: number) {
       hire_date: u.hire_date,
       balance_id: existing?.id ?? null,
       statutory_days,
+      statutory_days_override: existing?.statutory_days_override ?? null,
       allocated_mins,
       used_mins,
       carried_mins,
@@ -118,6 +122,12 @@ export async function setAnnualAllocatedMins(userId: string, year: number, alloc
   const annualType = (await listLeaveTypes(false)).find((t) => t.code === 'annual');
   if (!annualType) throw new AppError(500, '找不到年假假別');
   return setAllocatedBalance(userId, annualType.id, year, allocatedMins);
+}
+
+export async function setAnnualStatutoryDaysOverride(userId: string, year: number, overrideDays: number | null) {
+  const annualType = (await listLeaveTypes(false)).find((t) => t.code === 'annual');
+  if (!annualType) throw new AppError(500, '找不到年假假別');
+  return setStatutoryDaysOverride(userId, annualType.id, year, overrideDays);
 }
 
 export async function getCompBalances(year: number) {

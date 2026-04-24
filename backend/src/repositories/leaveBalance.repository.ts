@@ -66,6 +66,7 @@ export interface BalanceWithUser {
   used_mins: number;
   carried_mins: number;
   adjusted_mins: number;
+  statutory_days_override: number | null;
 }
 
 export async function listAllWithUsers(year: number, leaveTypeId: string): Promise<BalanceWithUser[]> {
@@ -75,7 +76,7 @@ export async function listAllWithUsers(year: number, leaveTypeId: string): Promi
     .whereNull('u.deleted_at')
     .select(
       'lb.id', 'lb.user_id', 'lb.leave_type_id', 'lb.year',
-      'lb.allocated_mins', 'lb.used_mins', 'lb.carried_mins', 'lb.adjusted_mins',
+      'lb.allocated_mins', 'lb.used_mins', 'lb.carried_mins', 'lb.adjusted_mins', 'lb.statutory_days_override',
       'u.employee_id', 'u.full_name', 'u.department', 'u.hire_date',
     )
     .orderBy('u.employee_id');
@@ -99,6 +100,18 @@ export async function setAllocatedBalance(
     .insert({ user_id: userId, leave_type_id: leaveTypeId, year, allocated_mins: allocatedMins })
     .onConflict(['user_id', 'leave_type_id', 'year'])
     .merge({ allocated_mins: allocatedMins })
+    .returning('*');
+  return row;
+}
+
+/** Set or clear statutory_days_override for a balance row */
+export async function setStatutoryDaysOverride(
+  userId: string, leaveTypeId: string, year: number, overrideDays: number | null,
+): Promise<LeaveBalance> {
+  const [row] = await db<LeaveBalance>('leave_balances')
+    .insert({ user_id: userId, leave_type_id: leaveTypeId, year, statutory_days_override: overrideDays })
+    .onConflict(['user_id', 'leave_type_id', 'year'])
+    .merge({ statutory_days_override: overrideDays })
     .returning('*');
   return row;
 }

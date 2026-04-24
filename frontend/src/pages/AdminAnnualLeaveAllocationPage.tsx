@@ -12,6 +12,7 @@ import {
   useAllocateAnnual,
   useAdjustLeaveBalance,
   useSetAnnualAllocated,
+  useSetStatutoryOverride,
   AnnualLeavePreviewRow,
 } from '@/api/leave.api'
 
@@ -34,12 +35,16 @@ export default function AdminAnnualLeaveAllocationPage() {
   const allocate = useAllocateAnnual()
   const adjust = useAdjustLeaveBalance()
   const setAllocated = useSetAnnualAllocated()
+  const setStatutoryOverride = useSetStatutoryOverride()
 
   const [adjustTarget, setAdjustTarget] = useState<AnnualLeavePreviewRow | null>(null)
   const [adjustMins, setAdjustMins] = useState('')
 
   const [allocateTarget, setAllocateTarget] = useState<AnnualLeavePreviewRow | null>(null)
   const [allocateHrs, setAllocateHrs] = useState('')
+
+  const [statutoryTarget, setStatutoryTarget] = useState<AnnualLeavePreviewRow | null>(null)
+  const [statutoryDays, setStatutoryDays] = useState('')
 
   const handleAllocate = async () => {
     try {
@@ -48,6 +53,19 @@ export default function AdminAnnualLeaveAllocationPage() {
       refetch()
     } catch {
       toast({ variant: 'destructive', title: '配發失敗' })
+    }
+  }
+
+  const handleSetStatutory = async () => {
+    if (!statutoryTarget) return
+    const days = parseFloat(statutoryDays)
+    if (isNaN(days) || days < 0) return
+    try {
+      await setStatutoryOverride.mutateAsync({ user_id: statutoryTarget.user_id, year: queryYear, override_days: days })
+      toast({ title: '已更新法定天數' })
+      setStatutoryTarget(null)
+    } catch {
+      toast({ variant: 'destructive', title: '更新失敗' })
     }
   }
 
@@ -84,9 +102,22 @@ export default function AdminAnnualLeaveAllocationPage() {
     {
       key: 'statutory_days',
       header: '法定天數',
-      render: (r) => r.statutory_days === 0
-        ? <Badge variant="secondary">未達資格</Badge>
-        : `${Number(r.statutory_days).toFixed(2)} 天（${(Number(r.statutory_days) * 8).toFixed(2)}h）`,
+      render: (r) => (
+        <button
+          className="text-left hover:underline hover:text-blue-600 cursor-pointer"
+          onClick={() => { setStatutoryTarget(r); setStatutoryDays(String(r.statutory_days)) }}
+        >
+          {r.statutory_days === 0
+            ? <Badge variant="secondary">未達資格</Badge>
+            : <span>
+                {Number(r.statutory_days).toFixed(2)} 天（{(Number(r.statutory_days) * 8).toFixed(2)}h）
+                {r.statutory_days_override != null && (
+                  <span className="ml-1 text-xs text-blue-500">（手動）</span>
+                )}
+              </span>
+          }
+        </button>
+      ),
     },
     {
       key: 'allocated_mins',
@@ -164,6 +195,47 @@ export default function AdminAnnualLeaveAllocationPage() {
         emptyText={isLoading ? '載入中...' : '查無資料，請先執行配發'}
         pageSize={20}
       />
+
+      <Dialog open={!!statutoryTarget} onOpenChange={(o) => !o && setStatutoryTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>設定法定天數 — {statutoryTarget?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">
+              手動覆蓋系統依年資計算的法定天數。設定後顯示「手動」標記。
+            </p>
+            <div>
+              <label className="text-sm font-medium">法定天數</label>
+              <Input
+                type="number"
+                step="0.5"
+                min="0"
+                className="mt-1"
+                placeholder="例：15（天）"
+                value={statutoryDays}
+                onChange={(e) => setStatutoryDays(e.target.value)}
+              />
+            </div>
+            {statutoryTarget?.statutory_days_override != null && (
+              <button
+                className="text-xs text-slate-400 hover:text-red-500 underline"
+                onClick={async () => {
+                  await setStatutoryOverride.mutateAsync({ user_id: statutoryTarget.user_id, year: queryYear, override_days: null })
+                  toast({ title: '已還原為系統計算值' })
+                  setStatutoryTarget(null)
+                }}
+              >
+                還原為系統計算值
+              </button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatutoryTarget(null)}>取消</Button>
+            <Button onClick={handleSetStatutory} disabled={setStatutoryOverride.isPending}>確認設定</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!allocateTarget} onOpenChange={(o) => !o && setAllocateTarget(null)}>
         <DialogContent>

@@ -91,6 +91,7 @@ export interface LeaveBalance {
   used_mins: number;
   carried_mins: number;
   adjusted_mins: number;
+  statutory_days_override: number | null;
 }
 
 export type ProxyStatus = 'pending' | 'approved' | 'rejected';

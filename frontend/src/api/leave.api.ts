@@ -116,6 +116,7 @@ export interface AnnualLeavePreviewRow {
   hire_date: string
   balance_id: string | null
   statutory_days: number
+  statutory_days_override: number | null
   allocated_mins: number
   used_mins: number
   carried_mins: number
@@ -138,6 +139,20 @@ export function useSetAnnualAllocated() {
   return useMutation({
     mutationFn: async ({ user_id, year, allocated_mins }: { user_id: string; year: number; allocated_mins: number }) => {
       const { data } = await apiClient.put('/leave/balances/set-allocated', { user_id, year, allocated_mins })
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['annual-preview'] })
+      qc.invalidateQueries({ queryKey: ['leave-balances'] })
+    },
+  })
+}
+
+export function useSetStatutoryOverride() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ user_id, year, override_days }: { user_id: string; year: number; override_days: number | null }) => {
+      const { data } = await apiClient.put('/leave/balances/set-statutory-override', { user_id, year, override_days })
       return data
     },
     onSuccess: () => {
