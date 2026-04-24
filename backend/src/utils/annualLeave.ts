@@ -14,7 +14,7 @@ function tierForMonths(totalMonths: number): number {
   if (years < 3) return 10;
   if (years < 5) return 14;
   if (years < 10) return 15;
-  return Math.min(15 + (years - 10), 30);
+  return Math.min(16 + (years - 10), 30);
 }
 
 /**
@@ -27,9 +27,10 @@ function tierForMonths(totalMonths: number): number {
  * Formula: proportionBefore × oldTier + (1 − proportionBefore) × newTier
  * where proportionBefore = ((anniversaryMonth − 1) + (anniversaryDay − 1) / daysInAnniversaryMonth) / 12
  *
- * Example (hire 2003-02-25, year 2026):
- *   proportionBefore = (1 + 24/28) / 12 ≈ 0.1548
- *   result = 0.1548 × 27 + 0.8452 × 28 ≈ 27.85 days
+ * Example (hire 2013-01-22, year 2026):
+ *   proportionBefore = (0 + 21/31) / 12 ≈ 0.0565
+ *   oldTier=18 (12 yrs), newTier=19 (13 yrs after Jan 22)
+ *   result = 0.0565 × 18 + 0.9435 × 19 ≈ 18.9 days → 151 hrs
  */
 export function calcAnnualLeaveDays(hireDateStr: string, asOfDate = new Date()): number {
   const hire = new Date(hireDateStr);
@@ -62,7 +63,8 @@ export function calcAnnualLeaveDays(hireDateStr: string, asOfDate = new Date()):
   return proportionBefore * oldTier + (1 - proportionBefore) * newTier;
 }
 
-/** Convert days to minutes (8h/day), preserving decimals */
+/** Convert days to minutes: round days to 1 decimal, then round hours to integer */
 export function daysToMins(days: number): number {
-  return days * 8 * 60;
+  const roundedDays = Math.round(days * 10) / 10;
+  return Math.round(roundedDays * 8) * 60;
 }
