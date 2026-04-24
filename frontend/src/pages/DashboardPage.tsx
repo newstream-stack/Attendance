@@ -25,7 +25,7 @@ function BalanceBar({ used, total }: { used: number; total: number }) {
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { data: balances = [] } = useLeaveBalances()
+  const { data: balances = [] } = useLeaveBalances(new Date().getFullYear())
   const { data: pending = [] } = usePendingApprovals()
   const { data: pendingOT = [] } = usePendingOvertimeApprovals()
 
