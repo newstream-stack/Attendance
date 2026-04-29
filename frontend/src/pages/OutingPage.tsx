@@ -13,6 +13,15 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useMyOutings, useSubmitOuting, useDeleteOuting, OutingRecord } from '@/api/outing.api'
 
+function getWeekRange() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
+  const day = now.getDay() // 0=Sun
+  const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+  const fmt = (d: Date) => d.toLocaleDateString('en-CA')
+  return { start: fmt(mon), end: fmt(sun) }
+}
+
 const schema = z.object({
   outing_date: z.string().min(1, '請選擇外出日期'),
   outing_time: z.string().optional(),
@@ -29,12 +38,29 @@ function fmtTime(t: string | null | undefined) {
 
 export default function OutingPage() {
   const { toast } = useToast()
-  const { data: outings = [], isLoading } = useMyOutings()
+  const defaultRange = getWeekRange()
+  const [rangeStart, setRangeStart] = useState(defaultRange.start)
+  const [rangeEnd, setRangeEnd] = useState(defaultRange.end)
+  const [appliedStart, setAppliedStart] = useState(defaultRange.start)
+  const [appliedEnd, setAppliedEnd] = useState(defaultRange.end)
+
+  const { data: outings = [], isLoading } = useMyOutings({ start: appliedStart, end: appliedEnd })
   const submit = useSubmitOuting()
   const deleteOuting = useDeleteOuting()
   const [deleteTarget, setDeleteTarget] = useState<OutingRecord | null>(null)
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+
+  const applyRange = () => {
+    setAppliedStart(rangeStart)
+    setAppliedEnd(rangeEnd)
+  }
+
+  const resetToWeek = () => {
+    const r = getWeekRange()
+    setRangeStart(r.start); setRangeEnd(r.end)
+    setAppliedStart(r.start); setAppliedEnd(r.end)
+  }
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -129,11 +155,30 @@ export default function OutingPage() {
       </Card>
 
       <div>
-        <h2 className="text-lg font-semibold text-slate-800 mb-3">我的外出記錄</h2>
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-slate-800 mr-2">我的外出記錄</h2>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              className="w-36"
+              value={rangeStart}
+              onChange={(e) => setRangeStart(e.target.value)}
+            />
+            <span className="text-slate-400">～</span>
+            <Input
+              type="date"
+              className="w-36"
+              value={rangeEnd}
+              onChange={(e) => setRangeEnd(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={applyRange}>查詢</Button>
+          <Button variant="ghost" size="sm" onClick={resetToWeek}>本週</Button>
+        </div>
         <DataTable
           data={outings as unknown as Record<string, unknown>[]}
           columns={columns as Column<Record<string, unknown>>[]}
-          emptyText={isLoading ? '載入中…' : '尚無外出記錄'}
+          emptyText={isLoading ? '載入中…' : '此區間無外出記錄'}
         />
       </div>
 

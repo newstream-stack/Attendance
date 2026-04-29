@@ -21,8 +21,8 @@ export async function submitOuting(data: {
   });
 }
 
-export async function getMyOutings(userId: string) {
-  return listMyOutings(userId);
+export async function getMyOutings(userId: string, params?: { start?: string; end?: string }) {
+  return listMyOutings(userId, params);
 }
 
 export async function getTodayOutings() {

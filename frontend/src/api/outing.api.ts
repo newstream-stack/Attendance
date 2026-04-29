@@ -15,11 +15,11 @@ export interface OutingRecord {
   employee_id?: string
 }
 
-export function useMyOutings() {
+export function useMyOutings(params?: { start?: string; end?: string }) {
   return useQuery({
-    queryKey: ['outings', 'mine'],
+    queryKey: ['outings', 'mine', params],
     queryFn: async () => {
-      const { data } = await apiClient.get<OutingRecord[]>('/outings')
+      const { data } = await apiClient.get<OutingRecord[]>('/outings', { params })
       return data
     },
   })

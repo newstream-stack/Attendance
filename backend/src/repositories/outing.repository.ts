@@ -28,10 +28,11 @@ export async function createOuting(data: {
   return row;
 }
 
-export async function listMyOutings(userId: string): Promise<OutingRow[]> {
-  return baseQuery()
-    .where('o.user_id', userId)
-    .orderBy('o.outing_date', 'desc');
+export async function listMyOutings(userId: string, params?: { start?: string; end?: string }): Promise<OutingRow[]> {
+  const q = baseQuery().where('o.user_id', userId);
+  if (params?.start) q.where('o.outing_date', '>=', params.start);
+  if (params?.end) q.where('o.outing_date', '<=', params.end);
+  return q.orderBy('o.outing_date', 'desc');
 }
 
 export async function listOutingsByDate(date: string): Promise<OutingRow[]> {

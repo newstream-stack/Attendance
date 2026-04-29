@@ -34,10 +34,22 @@ router.get(
   },
 );
 
-// GET /api/v1/outings  (own records)
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
-  try { res.json(await getMyOutings(req.user!.id)); } catch (e) { next(e); }
-});
+// GET /api/v1/outings?start=&end=  (own records)
+router.get(
+  '/',
+  validate({
+    query: z.object({
+      start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }),
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { start, end } = req.query as { start?: string; end?: string };
+      res.json(await getMyOutings(req.user!.id, { start, end }));
+    } catch (e) { next(e); }
+  },
+);
 
 // POST /api/v1/outings
 router.post(
