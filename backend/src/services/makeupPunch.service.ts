@@ -8,6 +8,9 @@ import {
   CreateMakeupPunchData,
 } from '../repositories/makeupPunch.repository';
 import { upsertClockIn, updateClockOut } from '../repositories/attendance.repository';
+import { findUserById, findFirstAdmin } from '../repositories/user.repository';
+import { getSettings } from '../repositories/systemSettings.repository';
+import { sendMakeupPunchApprovalRequestEmail } from '../utils/email';
 
 // ─── Rules ───────────────────────────────────────────────────────────────────
 
@@ -93,7 +96,25 @@ export async function submitRequest(userId: string, data: {
     reason: data.reason ?? null,
   };
 
-  return createRequest(payload);
+  const req = await createRequest(payload);
+
+  // Send approval request email to manager or admin (+ CC list from settings)
+  const [requester, settings] = await Promise.all([findUserById(userId), getSettings()]);
+  if (requester) {
+    const approver = requester.manager_id
+      ? await findUserById(requester.manager_id)
+      : await findFirstAdmin();
+
+    if (approver) {
+      sendMakeupPunchApprovalRequestEmail(
+        approver.email, approver.full_name, requester.full_name,
+        data.work_date, data.punch_type, data.requested_time, data.reason,
+        settings.notification_cc_emails,
+      ).catch((e) => console.error('[email] makeup punch approval request email failed:', e));
+    }
+  }
+
+  return req;
 }
 
 export async function listMyRequests(userId: string) {

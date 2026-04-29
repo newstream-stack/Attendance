@@ -24,6 +24,7 @@ router.put(
       late_tolerance_mins: z.number().int().min(0).optional(),
       hours_per_day: z.number().int().min(1).max(24).optional(),
       base_bonus_days: z.number().int().min(0).optional(),
+      notification_cc_emails: z.array(z.string().email()).optional(),
     }),
   }),
   async (req: Request, res: Response, next: NextFunction) => {

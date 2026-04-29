@@ -8,6 +8,7 @@ export interface SystemSettings {
   late_tolerance_mins: number
   hours_per_day: number
   base_bonus_days: number
+  notification_cc_emails: string[]
   updated_at: string
 }
 

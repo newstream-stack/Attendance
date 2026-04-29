@@ -9,6 +9,7 @@ import { AppError } from '../middleware/errorHandler';
 import { db } from '../config/database';
 import { deductLunchBreak } from '../utils/workingDays';
 import { sendOvertimeApprovalRequestEmail } from '../utils/email';
+import { getSettings } from '../repositories/systemSettings.repository';
 
 export async function submitOvertimeRequest(data: {
   userId: string;
@@ -40,20 +41,22 @@ export async function submitOvertimeRequest(data: {
     convert_to_comp: data.convertToComp,
   });
 
-  // Send approval request email to manager or admin
+  // Send approval request email to manager or admin (+ CC list from settings)
   const requester = await findUserById(data.userId);
   if (requester) {
     const toTaipeiTimeStr = (d: Date) =>
       d.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
 
-    const approver = requester.manager_id
-      ? await findUserById(requester.manager_id)
-      : await findFirstAdmin();
+    const [approver, settings] = await Promise.all([
+      requester.manager_id ? findUserById(requester.manager_id) : findFirstAdmin(),
+      getSettings(),
+    ]);
 
     if (approver) {
       sendOvertimeApprovalRequestEmail(
         approver.email, approver.full_name, requester.full_name,
         data.workDate, toTaipeiTimeStr(data.startTime), toTaipeiTimeStr(data.endTime), data.reason,
+        settings.notification_cc_emails,
       ).catch((e) => console.error('[email] overtime approval request email failed:', e));
     }
   }

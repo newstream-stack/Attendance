@@ -58,11 +58,13 @@ export async function sendProxyRejectionEmail(
 export async function sendLeaveApprovalRequestEmail(
   to: string, approverName: string, applicantName: string,
   leaveTypeName: string, startDate: string, endDate: string, reason?: string | null,
+  cc?: string[],
 ): Promise<void> {
   const url = `${env.FRONTEND_URL}/leave/approvals`;
   await resend.emails.send({
     from: env.SMTP_FROM,
     to,
+    ...(cc && cc.length > 0 ? { cc } : {}),
     subject: `【請假審核】${applicantName} 提出請假申請`,
     html: `
       <p>${approverName} 您好，</p>
@@ -80,11 +82,13 @@ export async function sendLeaveApprovalRequestEmail(
 export async function sendOvertimeApprovalRequestEmail(
   to: string, approverName: string, applicantName: string,
   workDate: string, startTime: string, endTime: string, reason?: string | null,
+  cc?: string[],
 ): Promise<void> {
   const url = `${env.FRONTEND_URL}/overtime/approvals`;
   await resend.emails.send({
     from: env.SMTP_FROM,
     to,
+    ...(cc && cc.length > 0 ? { cc } : {}),
     subject: `【加班審核】${applicantName} 提出加班申請`,
     html: `
       <p>${approverName} 您好，</p>
@@ -93,6 +97,32 @@ export async function sendOvertimeApprovalRequestEmail(
         <li><strong>日期：</strong>${workDate}</li>
         <li><strong>時間：</strong>${startTime} ～ ${endTime}</li>
         ${reason ? `<li><strong>原因：</strong>${reason}</li>` : ''}
+      </ul>
+      <p><a href="${url}">點此進入系統審核</a></p>
+    `,
+  });
+}
+
+export async function sendMakeupPunchApprovalRequestEmail(
+  to: string, approverName: string, applicantName: string,
+  workDate: string, punchType: 'clock_in' | 'clock_out', requestedTime: string, reason?: string | null,
+  cc?: string[],
+): Promise<void> {
+  const url = `${env.FRONTEND_URL}/admin/makeup-punch`;
+  const punchLabel = punchType === 'clock_in' ? '上班打卡' : '下班打卡';
+  await resend.emails.send({
+    from: env.SMTP_FROM,
+    to,
+    ...(cc && cc.length > 0 ? { cc } : {}),
+    subject: `【補打卡審核】${applicantName} 提出補打卡申請`,
+    html: `
+      <p>${approverName} 您好，</p>
+      <p>${applicantName} 提交了一份補打卡申請，請進入系統進行審核：</p>
+      <ul>
+        <li><strong>日期：</strong>${workDate}</li>
+        <li><strong>類型：</strong>${punchLabel}</li>
+        <li><strong>申請時間：</strong>${requestedTime}</li>
+        ${reason ? `<li><strong>說明：</strong>${reason}</li>` : ''}
       </ul>
       <p><a href="${url}">點此進入系統審核</a></p>
     `,

@@ -13,6 +13,7 @@ import { AppError } from '../middleware/errorHandler';
 import { LeaveType, UserRole } from '../types';
 import { sendProxyRequestEmail, sendProxyRejectionEmail, sendLeaveApprovalRequestEmail } from '../utils/email';
 import { resolveAttachmentPath } from '../middleware/upload';
+import { getSettings } from '../repositories/systemSettings.repository';
 
 // ─── Leave Types ─────────────────────────────────────────────────────────────
 
@@ -223,19 +224,21 @@ export async function submitLeaveRequest(data: {
     }
   }
 
-  // Send approval request email to manager or admin
+  // Send approval request email to manager or admin (+ CC list from settings)
   if (requester) {
     const startStr = data.startTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
     const endStr = data.endTime.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
 
-    const approver = requester.manager_id
-      ? await findUserById(requester.manager_id)
-      : await findFirstAdmin();
+    const [approver, settings] = await Promise.all([
+      requester.manager_id ? findUserById(requester.manager_id) : findFirstAdmin(),
+      getSettings(),
+    ]);
 
     if (approver) {
       sendLeaveApprovalRequestEmail(
         approver.email, approver.full_name, requester.full_name,
         leaveType.name_zh, startStr, endStr, data.reason,
+        settings.notification_cc_emails,
       ).catch((e) => console.error('[email] leave approval request email failed:', e));
     }
   }
