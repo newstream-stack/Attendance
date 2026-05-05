@@ -30,7 +30,11 @@ router.post('/clock-in', async (req: Request, res: Response, next: NextFunction)
 // POST /api/v1/attendance/clock-out
 router.post('/clock-out', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const record = await clockOutService(req.user!.id);
+    const raw = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+      ?? req.socket.remoteAddress
+      ?? '';
+    const ip = raw === '::1' ? '127.0.0.1' : raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+    const record = await clockOutService(req.user!.id, ip);
     res.json(record);
   } catch (err) {
     next(err);

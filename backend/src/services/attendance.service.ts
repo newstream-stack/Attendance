@@ -98,7 +98,10 @@ export async function clockInService(userId: string, ipAddress: string) {
   return clockIn(userId, workDate, ipAddress, isLate);
 }
 
-export async function clockOutService(userId: string) {
+export async function clockOutService(userId: string, ipAddress: string) {
+  const allowed = await findAllowedIpByAddress(ipAddress);
+  if (!allowed) throw new AppError(403, `此 IP（${ipAddress}）不允許打卡`);
+
   const workDate = getTaipeiDateString();
   const record = await findTodayRecord(userId, workDate);
 
