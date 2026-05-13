@@ -4,6 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { useTodayAttendance, useClockIn, useClockOut } from '@/api/attendance.api'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('zh-TW', {
@@ -26,6 +36,7 @@ export function ClockInCard() {
   const clockIn = useClockIn()
   const clockOut = useClockOut()
   const now = useClock()
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false)
 
   const handleClockIn = async () => {
     try {
@@ -38,7 +49,7 @@ export function ClockInCard() {
     }
   }
 
-  const handleClockOut = async () => {
+  const doClockOut = async () => {
     try {
       await clockOut.mutateAsync()
       toast({ title: '下班打卡成功' })
@@ -49,9 +60,34 @@ export function ClockInCard() {
     }
   }
 
+  const handleClockOut = () => {
+    const clockInTime = record?.clock_in ? new Date(record.clock_in) : null
+    const diffMs = clockInTime ? Date.now() - clockInTime.getTime() : Infinity
+    if (diffMs < 60_000) {
+      setShowClockOutConfirm(true)
+    } else {
+      doClockOut()
+    }
+  }
+
   const isBusy = clockIn.isPending || clockOut.isPending
 
   return (
+    <>
+    <AlertDialog open={showClockOutConfirm} onOpenChange={setShowClockOutConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>確定要下班打卡嗎？</AlertDialogTitle>
+          <AlertDialogDescription>
+            您剛才才完成上班打卡，距離上班不到 1 分鐘，確定要打下班卡嗎？
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction onClick={doClockOut}>確定下班</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
@@ -105,5 +141,6 @@ export function ClockInCard() {
         )}
       </CardContent>
     </Card>
+    </>
   )
 }
